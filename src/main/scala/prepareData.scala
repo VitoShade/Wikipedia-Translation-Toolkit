@@ -60,14 +60,14 @@ object prepareData extends App {
     /*val conf = new SparkConf().setAppName("pageRank").setMaster("local[4]")
     val sc = new SparkContext(conf)*/
 
-    val spark: SparkSession = SparkSession.builder.master("local").getOrCreate
+    val spark: SparkSession = SparkSession.builder.master("local[8]").getOrCreate
     val sc = spark.sparkContext
 
     // For implicit conversions like converting RDDs to DataFrames
     import spark.implicits._
 
-    val inputFile = "C:\\Users\\nik_9\\Desktop\\prova\\indice.txt"
-    val outputFile = "C:\\Users\\nik_9\\Desktop\\prova\\result"
+    val inputFile = "/Users/marco/Desktop/indice.txt"
+    val outputFile = "/Users/marco/Desktop/result.txt"
 
     val input:org.apache.spark.rdd.RDD[String] = sc.textFile(inputFile)
 
