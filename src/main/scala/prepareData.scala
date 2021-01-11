@@ -6,7 +6,7 @@ import scalaj.http.{Http, HttpConstants, HttpRequest}
 import java.net.URLEncoder
 import java.nio.charset.StandardCharsets
 
-
+//prova: Nicolò
 object APILangLinks {
   def callAPI(url: String): scalaj.http.HttpResponse[String] = {
     var result:scalaj.http.HttpResponse[String] = null
