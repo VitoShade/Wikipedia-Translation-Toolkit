@@ -1,9 +1,6 @@
 
-import org.apache.spark.SparkContext
-import org.apache.spark.SparkConf
 import org.apache.spark.sql.SparkSession
 import scalaj.http.{Http, HttpConstants, HttpRequest}
-
 import java.net.URLEncoder
 import java.nio.charset.StandardCharsets
 
@@ -55,25 +52,26 @@ object APIPageViewSync {
   }
 }
 
+//case class perché sono immutabili
+case class Entry(id: String, val1: String, val2: String)
+
 object prepareData extends App {
   override def main(args: Array[String]) {
-    /*val conf = new SparkConf().setAppName("pageRank").setMaster("local[4]")
-    val sc = new SparkContext(conf)*/
 
-    val spark: SparkSession = SparkSession.builder.master("local").getOrCreate
-    val sc = spark.sparkContext
+    val sparkSession = SparkSession.builder().master("local[4]").appName("prepareData").getOrCreate()
+    val sparkContext = sparkSession.sparkContext
 
     // For implicit conversions like converting RDDs to DataFrames
-    import spark.implicits._
+    import sparkSession.implicits._
 
     val inputFile = "C:\\Users\\nik_9\\Desktop\\prova\\indice.txt"
     val outputFile = "C:\\Users\\nik_9\\Desktop\\prova\\result"
 
-    val input:org.apache.spark.rdd.RDD[String] = sc.textFile(inputFile)
+    val input:org.apache.spark.rdd.RDD[String] = sparkContext.textFile(inputFile)
 
     //FileUtils.deleteDirectory(new File(outputFile))
 
-    //:org.apache.spark.rdd.RDD[(String, String, String)]
+    //result:org.apache.spark.rdd.RDD[Tupla]
     val result = input.map(line => {
 
       var result1:scalaj.http.HttpResponse[String] = APILangLinks.callAPI(line)
@@ -82,13 +80,15 @@ object prepareData extends App {
       var result2:scalaj.http.HttpResponse[String] = APIPageView.callAPI(line)
       //println(result2.body)
 
-      (line, result1.body, result2.body)
+      Entry(line, result1.body, result2.body)
     })
 
+    //TODO: da mettere le etichette giuste
     val resultDataFrame = result.toDF("id", "value1", "value2")
 
     resultDataFrame.show()
 
-    sc.stop()
+    //ferma anche lo sparkContext
+    sparkSession.stop()
   }
 }

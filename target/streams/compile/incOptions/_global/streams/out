@@ -3,6 +3,9 @@
 [debug] 	prepareData$.class
 [debug] 	APILangLinksSync.class
 [debug] 	APILangLinksSync$.class
+[debug] 	Entry.class
+[debug] 	prepareData$$typecreator5$1.class
+[debug] 	Entry$.class
 [debug] 	APIPageViewSync.class
 [debug] 	APILangLinks.class
 [debug] 	APIPageViewSync$.class
@@ -14,6 +17,9 @@
 [debug] 	prepareData$.class
 [debug] 	APILangLinksSync.class
 [debug] 	APILangLinksSync$.class
+[debug] 	Entry.class
+[debug] 	prepareData$$typecreator5$1.class
+[debug] 	Entry$.class
 [debug] 	APIPageViewSync.class
 [debug] 	APILangLinks.class
 [debug] 	APIPageViewSync$.class
@@ -25,7 +31,9 @@
 [debug] 	prepareData$.class
 [debug] 	APILangLinksSync.class
 [debug] 	APILangLinksSync$.class
+[debug] 	Entry.class
 [debug] 	prepareData$$typecreator5$1.class
+[debug] 	Entry$.class
 [debug] 	APIPageViewSync.class
 [debug] 	APILangLinks.class
 [debug] 	APIPageViewSync$.class
