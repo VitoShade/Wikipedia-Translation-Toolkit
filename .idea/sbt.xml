@@ -11,6 +11,7 @@
             <option value="$PROJECT_DIR$/project" />
           </set>
         </option>
+        <option name="sbtVersion" value="1.4.6" />
         <option name="useSbtShellForBuild" value="true" />
       </SbtProjectSettings>
     </option>

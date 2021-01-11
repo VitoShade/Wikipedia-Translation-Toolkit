@@ -56,6 +56,9 @@ object APIPageViewSync {
 }
 
 object prepareData extends App {
+
+  //PROVA1
+
   override def main(args: Array[String]) {
     val conf = new SparkConf().setAppName("pageRank").setMaster("local[4]")
     val sc = new SparkContext(conf)
