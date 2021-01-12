@@ -2,30 +2,66 @@
 import org.apache.spark.SparkContext
 import org.apache.spark.SparkConf
 import org.apache.spark.sql.SparkSession
-import scalaj.http.{Http, HttpConstants, HttpRequest}
+import scalaj.http.Http
 
 import java.net.URLEncoder
+import java.net.URLDecoder
 import java.nio.charset.StandardCharsets
 
 object APILangLinks {
-  def callAPI(url: String): scalaj.http.HttpResponse[String] = {
+  def callAPI(url: String): (Int, String) = {
     var result:scalaj.http.HttpResponse[String] = null
 
     println(url + " pt1")
     result = Http("https://en.wikipedia.org/w/api.php?action=parse&page=" + URLEncoder.encode(url, StandardCharsets.UTF_8) + "&format=json&prop=langlinks").asString
 
-    result
+    this.parseJSON(result.body)
+  }
+
+  def parseJSON(response: String): (Int, String) = {
+    val json = ujson.read(response)
+    val dati = json("parse").obj("langlinks").arr
+    (dati.size, dati.map(item => if(item.obj("lang").str == "it" ) item.obj("url").str).filter(_ != ()).mkString("").replace("https://it.wikipedia.org/wiki/",""))
+
+  }
+}
+
+object APIRedirect {
+  def callAPI(url: String): (Int, String) = {
+    var result:scalaj.http.HttpResponse[String] = null
+
+    println(url + " pt3")
+    result = Http("https://en.wikipedia.org/w/api.php?action=parse&page=" + URLEncoder.encode(url, StandardCharsets.UTF_8) + "&prop=text&format=json").asString
+    this.parseJSON(result.body)
+  }
+
+  def parseJSON(response: String): (Int, String) = {
+    val json = ujson.read(response)
+    val text = json("parse").obj("text").obj("*").str
+    val di_ref=if(text contains "class=\"redirectText\"" ) URLDecoder.decode(text.split("class=\"redirectText\"")(1).split("href=\"/wiki/")(1).split("\" title=\"")(0), StandardCharsets.UTF_8) else ""
+
+    (text.getBytes.length, di_ref)
   }
 }
 
 object APIPageView {
-  def callAPI(url: String): scalaj.http.HttpResponse[String] = {
+  def callAPI(url: String): List[Int] = {
     var result:scalaj.http.HttpResponse[String] = null
 
     println(url + " pt2")
-    result = Http("https://wikimedia.org/api/rest_v1/metrics/pageviews/per-article/en.wikipedia/all-access/all-agents/" + URLEncoder.encode(url, StandardCharsets.UTF_8) + "/monthly/20200101/20200201").asString
+    result = Http("https://wikimedia.org/api/rest_v1/metrics/pageviews/per-article/en.wikipedia/all-access/all-agents/" + URLEncoder.encode(url, StandardCharsets.UTF_8) + "/monthly/20200101/20210101").asString
+    if(result.is2xx) {
+      this.parseJSON(result.body)
+    } else{
+      println(result.body)
+      List.empty
+    }
+  }
 
-    result
+  def parseJSON(response: String): List[Int] = {
+    val json = ujson.read(response)
+    val views: List[Int] = json("items").arr.map(item => item.obj("views").toString.toInt).toList
+    views
   }
 }
 
@@ -66,28 +102,31 @@ object prepareData extends App {
     // For implicit conversions like converting RDDs to DataFrames
     import spark.implicits._
 
-    val inputFile = "C:\\Users\\nik_9\\Desktop\\prova\\indice.txt"
-    val outputFile = "C:\\Users\\nik_9\\Desktop\\prova\\result"
+    val inputFile = "/Users/stefano/IdeaProjects/Wikipedia-Translation-Toolkit/src/main/files/indice.txt"
+    //val outputFile = "C:\\Users\\nik_9\\Desktop\\prova\\result"
 
     val input:org.apache.spark.rdd.RDD[String] = sc.textFile(inputFile)
-
+    println(input)
     //FileUtils.deleteDirectory(new File(outputFile))
 
     //:org.apache.spark.rdd.RDD[(String, String, String)]
     val result = input.map(line => {
 
-      var result1:scalaj.http.HttpResponse[String] = APILangLinks.callAPI(line)
+      //var result1:scalaj.http.HttpResponse[String] = APILangLinks.callAPI(line)
       //println(result1.body)
+      var tuple1 = APILangLinks.callAPI(line)
+      //println(tuple1)
+      var tuple2 = APIPageView.callAPI(line)
+      println(line + "   " + tuple2)
+      var tuple3 = APIRedirect.callAPI(line)
+      //println(result3)
 
-      var result2:scalaj.http.HttpResponse[String] = APIPageView.callAPI(line)
-      //println(result2.body)
+      (line, tuple1, tuple2, tuple3)
+    }).count()
 
-      (line, result1.body, result2.body)
-    })
+    //val resultDataFrame = result.toDF("id", "value1", "value2")
 
-    val resultDataFrame = result.toDF("id", "value1", "value2")
-
-    resultDataFrame.show()
+    //resultDataFrame.show()
 
     sc.stop()
   }
