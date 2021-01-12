@@ -1,8 +1,13 @@
 
 import org.apache.spark.sql.SparkSession
 import scalaj.http.{Http, HttpConstants, HttpRequest}
+
 import java.net.URLEncoder
 import java.nio.charset.StandardCharsets
+import org.apache.commons.io.FileUtils
+
+import java.io._
+import scala.collection.mutable.ArrayBuffer
 
 object APILangLinks {
   def callAPI(url: String): scalaj.http.HttpResponse[String] = {
@@ -74,19 +79,22 @@ object prepareData extends App {
     //result:org.apache.spark.rdd.RDD[Tupla]
     val result = input.map(line => {
 
-      var result1:scalaj.http.HttpResponse[String] = APILangLinks.callAPI(line)
+      val result1:scalaj.http.HttpResponse[String] = APILangLinks.callAPI(line)
       //println(result1.body)
 
-      var result2:scalaj.http.HttpResponse[String] = APIPageView.callAPI(line)
+      val result2:scalaj.http.HttpResponse[String] = APIPageView.callAPI(line)
       //println(result2.body)
 
       Entry(line, result1.body, result2.body)
     })
 
-    //TODO: da mettere le etichette giuste
     val resultDataFrame = result.toDF("id", "value1", "value2")
 
-    resultDataFrame.show()
+    //resultDataFrame.show()
+
+    FileUtils.deleteDirectory(new File(outputFile))
+    resultDataFrame.write.save(outputFile)
+
 
     //ferma anche lo sparkContext
     sparkSession.stop()

@@ -1,4 +1,6 @@
 [debug] Acquiring lock on file C:\Users\nik_9\IdeaProjects\Wikipedia-Translation-Toolkit\project\target\.sbt-compilation-infos\wikipedia-translation-toolkit-compile\.sbt-idea-lock ...
-[warn] there was one deprecation warning (since 2.11.0); re-run with -deprecation for details
-[warn] one warning found
+[error] C:\Users\nik_9\IdeaProjects\Wikipedia-Translation-Toolkit\src\main\scala\prepareData.scala:102:31: unbound placeholder parameter
+[error]       case ArrayBuffer(_) => (_)
+[error]                               ^
+[error] one error found
 [debug] Releasing lock on file C:\Users\nik_9\IdeaProjects\Wikipedia-Translation-Toolkit\project\target\.sbt-compilation-infos\wikipedia-translation-toolkit-compile\.sbt-idea-lock.

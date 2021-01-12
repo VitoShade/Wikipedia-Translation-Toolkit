@@ -4,7 +4,6 @@
 [debug] 	APILangLinksSync.class
 [debug] 	APILangLinksSync$.class
 [debug] 	Entry.class
-[debug] 	prepareData$$typecreator5$1.class
 [debug] 	Entry$.class
 [debug] 	APIPageViewSync.class
 [debug] 	APILangLinks.class
@@ -18,7 +17,6 @@
 [debug] 	APILangLinksSync.class
 [debug] 	APILangLinksSync$.class
 [debug] 	Entry.class
-[debug] 	prepareData$$typecreator5$1.class
 [debug] 	Entry$.class
 [debug] 	APIPageViewSync.class
 [debug] 	APILangLinks.class
@@ -27,18 +25,19 @@
 [debug] 	prepareData.class
 [debug] 	APIPageView$.class
 [debug] 	APILangLinks$.class
-[debug] Registering generated classes:
-[debug] 	prepareData$.class
-[debug] 	APILangLinksSync.class
+[debug] Rolling back changes to class files.
+[debug] Removing generated classes:
+[debug] Restoring class files: 
+[debug] 	APIPageView.class
 [debug] 	APILangLinksSync$.class
-[debug] 	Entry.class
-[debug] 	prepareData$$typecreator5$1.class
-[debug] 	Entry$.class
-[debug] 	APIPageViewSync.class
 [debug] 	APILangLinks.class
-[debug] 	APIPageViewSync$.class
-[debug] 	APIPageView.class
-[debug] 	prepareData.class
-[debug] 	APIPageView$.class
 [debug] 	APILangLinks$.class
+[debug] 	prepareData$.class
+[debug] 	APIPageView$.class
+[debug] 	Entry.class
+[debug] 	APILangLinksSync.class
+[debug] 	prepareData.class
+[debug] 	APIPageViewSync$.class
+[debug] 	APIPageViewSync.class
+[debug] 	Entry$.class
 [debug] Removing the temporary directory used for backing up class files: C:\Users\nik_9\IdeaProjects\Wikipedia-Translation-Toolkit\target\scala-2.12\classes.bak
