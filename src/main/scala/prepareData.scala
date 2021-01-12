@@ -117,14 +117,19 @@ object prepareData extends App {
       //var result1:scalaj.http.HttpResponse[String] = APILangLinks.callAPI(line)
       //println(result1.body)
       var tuple1 = APILangLinks.callAPI(line)
+      val num_traduzioni = tuple1._1
+      val id_pagina_italiana = tuple1._2
       //println(tuple1)
       var tuple2 = APIPageView.callAPI(line)
+      val num_visualiz_anno = tuple2._1
+      val num_visualiz_mesi = tuple2._2
       //println(line + "   " + tuple2)
       APIPageView.callAPI(line)
       var tuple3 = APIRedirect.callAPI(line)
+      val byte_dim_page = tuple3._1
+      val id_redirect = tuple3._2
       //println(result3)
-
-      println((line, tuple1, tuple2, tuple3))
+      (line, num_traduzioni, id_pagina_italiana, num_visualiz_anno, num_visualiz_mesi, byte_dim_page, id_redirect)
     }).count()
 
     //val resultDataFrame = result.toDF("id", "value1", "value2")
