@@ -1,64 +1,19 @@
 
 import org.apache.spark.sql.SparkSession
-import scalaj.http.{Http, HttpConstants, HttpRequest}
-
-import java.net.URLEncoder
-import java.nio.charset.StandardCharsets
+import API.APILangLinks
+import API.APIRedirect
+import API.APIPageView
 import org.apache.commons.io.FileUtils
-
 import java.io._
-import scala.collection.mutable.ArrayBuffer
-
-object APILangLinks {
-  def callAPI(url: String): scalaj.http.HttpResponse[String] = {
-    var result:scalaj.http.HttpResponse[String] = null
-
-    println(url + " pt1")
-    result = Http("https://en.wikipedia.org/w/api.php?action=parse&page=" + URLEncoder.encode(url, StandardCharsets.UTF_8) + "&format=json&prop=langlinks").asString
-
-    result
-  }
-}
-
-object APIPageView {
-  def callAPI(url: String): scalaj.http.HttpResponse[String] = {
-    var result:scalaj.http.HttpResponse[String] = null
-
-    println(url + " pt2")
-    result = Http("https://wikimedia.org/api/rest_v1/metrics/pageviews/per-article/en.wikipedia/all-access/all-agents/" + URLEncoder.encode(url, StandardCharsets.UTF_8) + "/monthly/20200101/20200201").asString
-
-    result
-  }
-}
-
-object APILangLinksSync {
-  def callAPI(url: String): scalaj.http.HttpResponse[String] = {
-    var result:scalaj.http.HttpResponse[String] = null
-
-    this.synchronized {
-      println(url + " pt1")
-      result = Http("https://en.wikipedia.org/w/api.php?action=parse&page=" + URLEncoder.encode(url, StandardCharsets.UTF_8) + "&format=json&prop=langlinks").asString
-    }
-
-    result
-  }
-}
-
-object APIPageViewSync {
-  def callAPI(url: String): scalaj.http.HttpResponse[String] = {
-    var result:scalaj.http.HttpResponse[String] = null
-
-    this.synchronized {
-      println(url + " pt2")
-      result = Http("https://wikimedia.org/api/rest_v1/metrics/pageviews/per-article/en.wikipedia/all-access/all-agents/" + URLEncoder.encode(url, StandardCharsets.UTF_8) + "/monthly/20200101/20200201").asString
-    }
-
-    result
-  }
-}
 
 //case class perché sono immutabili
-case class Entry(id: String, val1: String, val2: String)
+case class Entry(id: String,
+                 numTraduzioni: Int,
+                 IDPaginaIta: String,
+                 numVisualizzazioniAnno: List[Int],
+                 numVisualizzazioniMesi: List[Int],
+                 numByte: Int,
+                 IDPaginaPrincipale: String)
 
 object prepareData extends App {
   override def main(args: Array[String]) {
@@ -76,24 +31,35 @@ object prepareData extends App {
 
     //FileUtils.deleteDirectory(new File(outputFile))
 
-    //result:org.apache.spark.rdd.RDD[Tupla]
     val result = input.map(line => {
 
-      val result1:scalaj.http.HttpResponse[String] = APILangLinks.callAPI(line)
-      //println(result1.body)
+      var tuple1 = APILangLinks.callAPI(line, "en", "it")
+      val num_traduzioni = tuple1._1
+      val id_pagina_italiana = tuple1._2
+      //println(tuple1)
 
-      val result2:scalaj.http.HttpResponse[String] = APIPageView.callAPI(line)
-      //println(result2.body)
+      var tuple2 = APIPageView.callAPI(line, "en")
+      val num_visualiz_anno = tuple2._1
+      val num_visualiz_mesi = tuple2._2
+      //println(line + "   " + tuple2)
+      //println(num_visualiz_anno)
 
-      Entry(line, result1.body, result2.body)
+      var tuple3 = APIRedirect.callAPI(line, "en")
+      val byte_dim_page = tuple3._1
+      val id_redirect = tuple3._2
+      //println(result3)
+
+      Entry(line, num_traduzioni, id_pagina_italiana, num_visualiz_anno, num_visualiz_mesi, byte_dim_page, id_redirect)
     })
 
-    val resultDataFrame = result.toDF("id", "value1", "value2")
+    //println(result)
 
-    //resultDataFrame.show()
+    val resultDataFrame = result.toDF("id", "num_traduzioni", "id_pagina_italiana", "num_visualiz_anno", "num_visualiz_mesi", "byte_dim_page", "id_redirect")
 
-    FileUtils.deleteDirectory(new File(outputFile))
-    resultDataFrame.write.save(outputFile)
+    resultDataFrame.show(false)
+
+    /*FileUtils.deleteDirectory(new File(outputFile))
+    resultDataFrame.write.save(outputFile)*/
 
 
     //ferma anche lo sparkContext
