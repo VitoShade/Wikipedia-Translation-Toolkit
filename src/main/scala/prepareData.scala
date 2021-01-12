@@ -1,6 +1,3 @@
-
-import org.apache.spark.SparkContext
-import org.apache.spark.SparkConf
 import org.apache.spark.sql.SparkSession
 import scalaj.http.Http
 
@@ -45,23 +42,28 @@ object APIRedirect {
 }
 
 object APIPageView {
-  def callAPI(url: String): List[Int] = {
+  def callAPI(url: String): (List[Int], List[Int]) = {
     var result:scalaj.http.HttpResponse[String] = null
 
     println(url + " pt2")
-    result = Http("https://wikimedia.org/api/rest_v1/metrics/pageviews/per-article/en.wikipedia/all-access/all-agents/" + URLEncoder.encode(url, StandardCharsets.UTF_8) + "/monthly/20200101/20210101").asString
+    result = Http("https://wikimedia.org/api/rest_v1/metrics/pageviews/per-article/en.wikipedia/all-access/all-agents/" + URLEncoder.encode(url, StandardCharsets.UTF_8) + "/monthly/20180101/20210101").asString
     if(result.is2xx) {
       this.parseJSON(result.body)
     } else{
       println(result.body)
-      List.empty
+      (List(0,0,0), List(0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0))
     }
   }
 
-  def parseJSON(response: String): List[Int] = {
+  def parseJSON(response: String): (List[Int], List[Int]) = {
     val json = ujson.read(response)
-    val views: List[Int] = json("items").arr.map(item => item.obj("views").toString.toInt).toList
-    views
+    //val views: List[Int] = json("items").arr.map(item => item.obj("views").toString.toInt).toList
+    val mappa=json("items").arr.map(item => item.obj("timestamp").str.dropRight(4) -> item.obj("views").toString.toInt).toMap
+    val anni = List("2018", "2019", "2020")
+    val filtrato = anni.map(anno => mappa.filterKeys(_.dropRight(2) contains anno).values.sum)
+    var mesi = Array(0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0)
+    mappa.filterKeys(_.dropRight(2) contains "2020").foreach(item => mesi(item._1.slice(4,6).toInt-1) = item._2)
+    (filtrato, mesi.toList)
   }
 }
 
@@ -117,11 +119,12 @@ object prepareData extends App {
       var tuple1 = APILangLinks.callAPI(line)
       //println(tuple1)
       var tuple2 = APIPageView.callAPI(line)
-      println(line + "   " + tuple2)
+      //println(line + "   " + tuple2)
+      APIPageView.callAPI(line)
       var tuple3 = APIRedirect.callAPI(line)
       //println(result3)
 
-      (line, tuple1, tuple2, tuple3)
+      println((line, tuple1, tuple2, tuple3))
     }).count()
 
     //val resultDataFrame = result.toDF("id", "value1", "value2")
