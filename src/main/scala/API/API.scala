@@ -9,13 +9,23 @@ package API {
   object APILangLinks {
     def callAPI(url: String, sourceLang: String, destLang: String): (Int, String) = {
       var result:scalaj.http.HttpResponse[String] = null
-
-      println(url + " pt1")
-      result = Http("https://" + URLEncoder.encode(sourceLang, StandardCharsets.UTF_8) +
-        ".wikipedia.org/w/api.php?action=parse&page=" + URLEncoder.encode(url, StandardCharsets.UTF_8) + "&format=json&prop=langlinks"
-      ).asString
-
-      this.parseJSON(result.body, destLang)
+      var cond = true
+      var ret:(Int, String) = null
+      //println(url + " pt1")
+      while(cond) {
+        result = Http("https://" + URLEncoder.encode(sourceLang, StandardCharsets.UTF_8) +
+          ".wikipedia.org/w/api.php?action=parse&page=" + URLEncoder.encode(url, StandardCharsets.UTF_8) + "&format=json&prop=langlinks"
+        ).asString
+        if(result.is2xx) {
+          cond = false
+          try {
+            ret = this.parseJSON(result.body, destLang)
+          }catch{
+            case e:Exception => ret = (0, "")
+          }
+        }
+      }
+      ret
     }
 
     def parseJSON(response: String, lang: String): (Int, String) = {
@@ -29,11 +39,22 @@ package API {
   object APIRedirect {
     def callAPI(url: String, lang:String): (Int, String) = {
       var result:scalaj.http.HttpResponse[String] = null
-
-      println(url + " pt3")
-      result = Http("https://" + URLEncoder.encode(lang, StandardCharsets.UTF_8) +
-        ".wikipedia.org/w/api.php?action=parse&page=" + URLEncoder.encode(url, StandardCharsets.UTF_8) + "&prop=text&format=json").asString
-      this.parseJSON(result.body)
+      var cond = true
+      var ret:(Int, String) = null
+      //println(url + " pt3")
+      while(cond) {
+        result = Http("https://" + URLEncoder.encode(lang, StandardCharsets.UTF_8) +
+          ".wikipedia.org/w/api.php?action=parse&page=" + URLEncoder.encode(url, StandardCharsets.UTF_8) + "&prop=text&format=json").asString
+        if(result.is2xx) {
+          cond = false
+          try {
+            ret = this.parseJSON(result.body)
+          }catch{
+            case e:Exception => ret = (0, "")
+          }
+        }
+      }
+      ret
     }
 
     def parseJSON(response: String): (Int, String) = {
@@ -45,18 +66,22 @@ package API {
     }
   }
 
+  //Se lo mettiamo qui rischiamo di andare in loop infinito perchè se la pagina non esisteva in quel lasso di tempo, allora da 404
   object APIPageView {
+
+    var lista_errori: Vector[(String, String)] = Vector()
+
     def callAPI(url: String, lang:String): (List[Int], List[Int]) = {
       var result:scalaj.http.HttpResponse[String] = null
 
-      println(url + " pt2")
+      //println(url + " pt2")
       result = Http("https://wikimedia.org/api/rest_v1/metrics/pageviews/per-article/" + URLEncoder.encode(lang, StandardCharsets.UTF_8) +
         ".wikipedia/all-access/all-agents/" + URLEncoder.encode(url, StandardCharsets.UTF_8) + "/monthly/20180101/20210101").asString
 
       if(result.is2xx) {
         this.parseJSON(result.body)
       } else{
-        println(result.body)
+        this.lista_errori=this.lista_errori :+  (url, result.body)
         (List(0,0,0), List(0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0))
       }
     }

@@ -1,4 +1,5 @@
 [debug] Acquiring lock on file C:\Users\nik_9\IdeaProjects\Wikipedia-Translation-Toolkit\project\target\.sbt-compilation-infos\wikipedia-translation-toolkit-compile\.sbt-idea-lock ...
-[warn] there was one deprecation warning (since 2.11.0); re-run with -deprecation for details
-[warn] one warning found
+[warn] there were two deprecation warnings (since 2.11.0); re-run with -deprecation for details
+[warn] there was one feature warning; re-run with -feature for details
+[warn] two warnings found
 [debug] Releasing lock on file C:\Users\nik_9\IdeaProjects\Wikipedia-Translation-Toolkit\project\target\.sbt-compilation-infos\wikipedia-translation-toolkit-compile\.sbt-idea-lock.

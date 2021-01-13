@@ -24,12 +24,10 @@ object prepareData extends App {
     // For implicit conversions like converting RDDs to DataFrames
     import sparkSession.implicits._
 
-    val inputFile = "C:\\Users\\nik_9\\Desktop\\prova\\indice.txt"
+    val inputFile = "C:\\Users\\nik_9\\Desktop\\prova\\indice10.txt"
     val outputFile = "C:\\Users\\nik_9\\Desktop\\prova\\result"
 
     val input:org.apache.spark.rdd.RDD[String] = sparkContext.textFile(inputFile)
-
-    //FileUtils.deleteDirectory(new File(outputFile))
 
     val result = input.map(line => {
 
@@ -50,17 +48,28 @@ object prepareData extends App {
       //println(result3)
 
       Entry(line, num_traduzioni, id_pagina_italiana, num_visualiz_anno, num_visualiz_mesi, byte_dim_page, id_redirect)
-    })
+    }).persist()
 
     //println(result)
 
     val resultDataFrame = result.toDF("id", "num_traduzioni", "id_pagina_italiana", "num_visualiz_anno", "num_visualiz_mesi", "byte_dim_page", "id_redirect")
 
-    resultDataFrame.show(false)
+    //resultDataFrame.show(false)
 
-    /*FileUtils.deleteDirectory(new File(outputFile))
-    resultDataFrame.write.save(outputFile)*/
+    FileUtils.deleteDirectory(new File(outputFile))
+    resultDataFrame.write.parquet(outputFile)
 
+    val folder = new File(outputFile)
+
+    val files: Array[String] = folder.listFiles.filter(file => file.isFile && (file.toString.takeRight(15) == ".snappy.parquet")).map(file => file toString)
+
+    val dataFrameFromFiles = files map (n => sparkSession.read.parquet(n))
+
+    dataFrameFromFiles.foreach(_.show(false))
+
+    val res2 = dataFrameFromFiles.reduce(_ union _)
+
+    res2.show(false)
 
     //ferma anche lo sparkContext
     sparkSession.stop()
