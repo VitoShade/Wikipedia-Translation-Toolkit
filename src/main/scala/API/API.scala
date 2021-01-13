@@ -7,21 +7,21 @@ import scalaj.http.Http
 package API {
 
   object APILangLinks {
-    def callAPI(url: String, lang:String): (Int, String) = {
+    def callAPI(url: String, sourceLang: String, destLang: String): (Int, String) = {
       var result:scalaj.http.HttpResponse[String] = null
 
       println(url + " pt1")
-      result = Http("https://" + URLEncoder.encode(lang, StandardCharsets.UTF_8) +
+      result = Http("https://" + URLEncoder.encode(sourceLang, StandardCharsets.UTF_8) +
         ".wikipedia.org/w/api.php?action=parse&page=" + URLEncoder.encode(url, StandardCharsets.UTF_8) + "&format=json&prop=langlinks"
       ).asString
 
-      this.parseJSON(result.body)
+      this.parseJSON(result.body, destLang)
     }
 
-    def parseJSON(response: String): (Int, String) = {
+    def parseJSON(response: String, lang: String): (Int, String) = {
       val json = ujson.read(response)
       val dati = json("parse").obj("langlinks").arr
-      (dati.size, dati.map(item => if(item.obj("lang").str == "it" ) item.obj("url").str).filter(_ != ()).mkString("").replace("https://it.wikipedia.org/wiki/",""))
+      (dati.size, dati.map(item => if(item.obj("lang").str == lang ) item.obj("url").str).filter(_ != ()).mkString("").replace("https://" + lang + ".wikipedia.org/wiki/",""))
 
     }
   }
@@ -51,7 +51,7 @@ package API {
 
       println(url + " pt2")
       result = Http("https://wikimedia.org/api/rest_v1/metrics/pageviews/per-article/" + URLEncoder.encode(lang, StandardCharsets.UTF_8) +
-        ".wikipedia/all-access/all-agents/" + URLEncoder.encode(url, StandardCharsets.UTF_8) + "/monthly/20200101/20210101").asString
+        ".wikipedia/all-access/all-agents/" + URLEncoder.encode(url, StandardCharsets.UTF_8) + "/monthly/20180101/20210101").asString
 
       if(result.is2xx) {
         this.parseJSON(result.body)
