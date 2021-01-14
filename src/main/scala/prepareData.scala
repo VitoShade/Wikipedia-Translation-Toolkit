@@ -3,6 +3,7 @@ import org.apache.spark.sql.SparkSession
 import API.APILangLinks
 import API.APIRedirect
 import API.APIPageView
+import Utilities._
 import org.apache.commons.io.FileUtils
 import java.io._
 
@@ -24,21 +25,23 @@ object prepareData extends App {
     // For implicit conversions like converting RDDs to DataFrames
     import sparkSession.implicits._
 
+    //TODO: cambiare path
     val inputFolderName = "C:\\Users\\nik_9\\Desktop\\prova\\indici"
     val tempFolderName = "C:\\Users\\nik_9\\Desktop\\prova\\tempResult"
     val outputFolderName = "C:\\Users\\nik_9\\Desktop\\prova\\result"
 
     val inputFolder = new File(inputFolderName)
 
-    val files: Array[String] = inputFolder.listFiles.filter(file => file.isFile && (file.toString.takeRight(4) == ".txt")).map(file => file.toString)
+    val inputFiles: Array[String] = inputFolder.listFiles.filter(file => file.isFile && (file.toString.takeRight(4) == ".txt")).map(file => file.toString)
 
-    var outputFolders: Array[String] = Array[String]()
+    var tempOutputFolders: Array[String] = Array[String]()
 
-    //files.foreach(println)
-    files.foreach(inputFileName => {
+    //inputFiles.foreach(println)
+    inputFiles.foreach(inputFileName => {
+
       val input: org.apache.spark.rdd.RDD[String] = sparkContext.textFile(inputFileName)
 
-      val result = input.map(line => {
+      val tempResult = input.map(line => {
 
         //println(line)
 
@@ -63,49 +66,34 @@ object prepareData extends App {
 
       //println(result)
 
-      val resultDataFrame = result.toDF("id", "num_traduzioni", "id_pagina_italiana", "num_visualiz_anno", "num_visualiz_mesi", "byte_dim_page", "id_redirect")
+      val tempDataFrame = tempResult.toDF("id", "num_traduzioni", "id_pagina_italiana", "num_visualiz_anno", "num_visualiz_mesi", "byte_dim_page", "id_redirect")
 
-      //resultDataFrame.show(false)
+      //tempDataFrame.show(false)
 
-      val outputName = inputFileName.drop(36).dropRight(4)
-      val outputFolder = tempFolderName + "\\" + outputName
+      val tempOutputName = inputFileName.drop(inputFolderName.length + 1).dropRight(4)
 
-      outputFolders = outputFolders :+ outputFolder
+      //TODO: cambiare il \\ in // ?
+      val tempOutputFolder = tempFolderName + "\\" + tempOutputName
 
-      //println(outputFolder)
+      tempOutputFolders = tempOutputFolders :+ tempOutputFolder
 
-      FileUtils.deleteDirectory(new File(outputFolder))
-      resultDataFrame.write.parquet(outputFolder)
+      FileUtils.deleteDirectory(new File(tempOutputFolder))
+      tempDataFrame.write.parquet(tempOutputFolder)
 
     })
 
-    //outputFolders.foreach(println)
+    val allTempFiles = DataFrameUtility.collectParquetFilesFromFolders(tempOutputFolders)
 
-    var allFiles: Array[String] = Array[String]()
+    val dataFrameTempFiles = allTempFiles map (n => sparkSession.read.parquet(n))
 
-    outputFolders.foreach(tempFolder => {
-        val folder = new File(tempFolder)
+    val notCompressedDataFrame = dataFrameTempFiles.reduce(_ union _)
 
-        val files: Array[String] = folder.listFiles.filter(file => file.isFile && (file.toString.takeRight(15) == ".snappy.parquet")).map(file => file toString)
+    notCompressedDataFrame.show(false)
 
-        allFiles = allFiles ++ files
-
-      }
-    )
-
-    //allFiles.foreach(println)
-
-    val dataFrameFromFiles = allFiles map (n => sparkSession.read.parquet(n))
-
-    //dataFrameFromFiles.foreach(_.show(false))
-
-    val res2 = dataFrameFromFiles.reduce(_ union _)
-
-    res2.show(false)
+    val resultDataFrame = notCompressedDataFrame.coalesce(2)
 
     FileUtils.deleteDirectory(new File(outputFolderName))
-    res2.write.parquet(outputFolderName)
-
+    resultDataFrame.write.parquet(outputFolderName)
 
     //ferma anche lo sparkContext
     sparkSession.stop()
