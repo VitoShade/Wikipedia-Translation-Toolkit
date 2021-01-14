@@ -71,6 +71,10 @@ package API {
             try {
               ret = this.parseJSON(result.body)
             }catch{
+              case e:java.util.NoSuchElementException => {
+                ret = (0, "")
+                this.lista_errori=this.lista_errori :+  (url, counter, "Pagina non trovata")
+              }
               case e:Exception => {
                 ret = (0, "")
                 this.lista_errori=this.lista_errori :+  (url, counter, e.getMessage)
