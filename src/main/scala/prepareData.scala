@@ -8,13 +8,20 @@ import org.apache.commons.io.FileUtils
 import java.io._
 
 //case class perché sono immutabili
-case class Entry(id: String,
+case class EntrySrc(id: String,
                  numTraduzioni: Int,
                  IDPaginaTradotta: String,
                  numVisualizzazioniAnno: List[Int],
                  numVisualizzazioniMesi: List[Int],
                  numByte: Int,
                  IDPaginaPrincipale: String)
+
+case class EntryDst(id: String,
+                    IDPaginaTradotta: String,
+                    numVisualizzazioniAnno: List[Int],
+                    numVisualizzazioniMesi: List[Int],
+                    numByte: Int,
+                    IDPaginaPrincipale: String)
 
 object prepareData extends App {
   override def main(args: Array[String]) {
@@ -35,81 +42,133 @@ object prepareData extends App {
 
     val inputFolder = new File(inputFolderName)
 
-    val inputFiles: Array[String] = inputFolder.listFiles.filter(file => file.isFile && (file.toString.takeRight(4) == ".txt")).map(file => file.toString)
+    val inputFiles = inputFolder.listFiles.filter(file => file.isFile && (file.toString.takeRight(4) == ".txt")).map(file => file.toString)
 
-    var tempOutputFolders: Array[String] = Array[String]()
+    var tempOutputFoldersSrc = Array[String]()
+    var tempOutputFoldersDst = Array[String]()
 
     //inputFiles.foreach(println)
     inputFiles.foreach(inputFileName => {
 
-      val input: org.apache.spark.rdd.RDD[String] = sparkContext.textFile(inputFileName)
+      val input = sparkContext.textFile(inputFileName)
 
-      val tempResult = input.map(line => {
+      var counter = 0
 
-        //println(line)
+      val tempResultSrc = input.map(line => {
 
-        var tuple1 = APILangLinks.callAPI(line, "en", "it")
+        println(counter)
+
+        val tuple1 = APILangLinks.callAPI(line, "en", "it")
         val num_traduzioni = tuple1._1
         val id_pagina_tradotta = tuple1._2
         //println(tuple1)
 
-        var tuple2 = APIPageView.callAPI(line, "en")
+        val tuple2 = APIPageView.callAPI(line, "en")
         val num_visualiz_anno = tuple2._1
         val num_visualiz_mesi = tuple2._2
         //println(line + "   " + tuple2)
         //println(num_visualiz_anno)
 
-        var tuple3 = APIRedirect.callAPI(line, "en")
+        val tuple3 = APIRedirect.callAPI(line, "en")
         val byte_dim_page = tuple3._1
         val id_redirect = tuple3._2
         //println(result3)
 
-        Entry(line, num_traduzioni, id_pagina_tradotta, num_visualiz_anno, num_visualiz_mesi, byte_dim_page, id_redirect)
+        counter += 1
+
+        EntrySrc(line, num_traduzioni, id_pagina_tradotta, num_visualiz_anno, num_visualiz_mesi, byte_dim_page, id_redirect)
+
       }).persist
 
       //println(result)
 
-      val tempDataFrame = tempResult.toDF("id", "num_traduzioni", "id_pagina_tradotta", "num_visualiz_anno", "num_visualiz_mesi", "byte_dim_page", "id_redirect")
+      val tempDataFrameSrc = tempResultSrc.toDF("id", "num_traduzioni", "id_pagina_tradotta", "num_visualiz_anno", "num_visualiz_mesi", "byte_dim_page", "id_redirect")
 
       //tempDataFrame.show(false)
 
       val tempOutputName = inputFileName.drop(inputFolderName.length + 1).dropRight(4)
 
-      val tempOutputFolder = tempFolderName + folderSeparator + tempOutputName
+      val tempOutputFolderSrc = tempFolderName + folderSeparator + "en" + folderSeparator + tempOutputName
 
-      tempOutputFolders = tempOutputFolders :+ tempOutputFolder
+      tempOutputFoldersSrc = tempOutputFoldersSrc :+ tempOutputFolderSrc
 
-      FileUtils.deleteDirectory(new File(tempOutputFolder))
-      tempDataFrame.write.parquet(tempOutputFolder)
+      FileUtils.deleteDirectory(new File(tempOutputFolderSrc))
+      tempDataFrameSrc.write.parquet(tempOutputFolderSrc)
+
+      //recupero colonna ID pagine tradotte
+      val dataFrameTranslatedID = tempDataFrameSrc.filter("id_pagina_tradotta != ''").select("id_pagina_tradotta")
+
+      //dataFrameTranslatedID.show(false)
+
+      //recupero ID pagine tradotte
+      val translatedID = dataFrameTranslatedID.map(row => row.getString(0))
+
+      counter = 0
+
+      val tempResultDst = translatedID.map(line => {
+
+        println(counter)
+
+        val tuple1 = APILangLinks.callAPI(line, "it", "en")
+        //val num_traduzioni = tuple1._1
+        val id_pagina_tradotta = tuple1._2
+        //println(tuple1)
+
+        val tuple2 = APIPageView.callAPI(line, "it")
+        val num_visualiz_anno = tuple2._1
+        val num_visualiz_mesi = tuple2._2
+
+        val tuple3 = APIRedirect.callAPI(line, "it")
+        val byte_dim_page = tuple3._1
+        val id_redirect = tuple3._2
+
+        counter += 1
+
+        EntryDst(line, id_pagina_tradotta, num_visualiz_anno, num_visualiz_mesi, byte_dim_page, id_redirect)
+
+      }).persist
+
+      val tempDataFrameDst = tempResultDst.toDF("id", "id_pagina_tradotta", "num_visualiz_anno", "num_visualiz_mesi", "byte_dim_page", "id_redirect")
+
+      val tempOutputFolderDst = tempFolderName + folderSeparator + "it" + folderSeparator + tempOutputName
+
+      tempOutputFoldersDst = tempOutputFoldersDst :+ tempOutputFolderDst
+
+      FileUtils.deleteDirectory(new File(tempOutputFolderDst))
+      tempDataFrameDst.write.parquet(tempOutputFolderDst)
+
+      println("Lista errori APILangLinks: " + APILangLinks.lista_errori)
+      println("Lista errori APIPageView:  " + APIPageView.lista_errori)
+      println("Lista errori APIRedirect:  " + APIRedirect.lista_errori)
 
     })
 
-    val allTempFiles = DataFrameUtility.collectParquetFilesFromFolders(tempOutputFolders)
+    val allTempFilesSrc = DataFrameUtility.collectParquetFilesFromFolders(tempOutputFoldersSrc)
 
-    val dataFrameTempFiles = allTempFiles map (tempFile => sparkSession.read.parquet(tempFile))
+    val dataFrameTempFilesSrc = allTempFilesSrc map (tempFile => sparkSession.read.parquet(tempFile))
 
-    val notCompressedDataFrame = dataFrameTempFiles.reduce(_ union _)
+    val notCompressedDataFrameSrc = dataFrameTempFilesSrc.reduce(_ union _)
 
-    notCompressedDataFrame.show(false)
+    notCompressedDataFrameSrc.show(false)
 
-    //notCompressedDataFrame.select("id_pagina_tradotta").show(false)
+    val resultDataFrameSrc = notCompressedDataFrameSrc.coalesce(2)
 
-    val col = notCompressedDataFrame.filter("id_pagina_tradotta != ''").select("id_pagina_tradotta")
+    FileUtils.deleteDirectory(new File(outputFolderName + folderSeparator + "en"))
+    resultDataFrameSrc.write.parquet(outputFolderName + folderSeparator + "en")
 
-    col.show(false)
 
-    val translatedIndexes = col.map(row => row.getString(0))
+    val allTempFilesDst = DataFrameUtility.collectParquetFilesFromFolders(tempOutputFoldersDst)
 
-    translatedIndexes.foreach(n => println(n))
+    val dataFrameTempFilesDst = allTempFilesDst map (tempFile => sparkSession.read.parquet(tempFile))
 
-    //col.(n => println(n))
+    val notCompressedDataFrameDst = dataFrameTempFilesDst.reduce(_ union _)
 
-    //tempRes.foreach(n => println(n))
+    notCompressedDataFrameDst.show(false)
 
-    val resultDataFrame = notCompressedDataFrame.coalesce(2)
+    val resultDataFrameDst = notCompressedDataFrameDst.coalesce(2)
 
-    FileUtils.deleteDirectory(new File(outputFolderName))
-    resultDataFrame.write.parquet(outputFolderName)
+    FileUtils.deleteDirectory(new File(outputFolderName + folderSeparator + "it"))
+    resultDataFrameDst.write.parquet(outputFolderName + folderSeparator + "it")
 
     //ferma anche lo sparkContext
     sparkSession.stop()
