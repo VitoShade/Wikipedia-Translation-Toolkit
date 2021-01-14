@@ -10,7 +10,7 @@ import java.io._
 //case class perché sono immutabili
 case class Entry(id: String,
                  numTraduzioni: Int,
-                 IDPaginaIta: String,
+                 IDPaginaTradotta: String,
                  numVisualizzazioniAnno: List[Int],
                  numVisualizzazioniMesi: List[Int],
                  numByte: Int,
@@ -22,6 +22,8 @@ object prepareData extends App {
     val sparkSession = SparkSession.builder().master("local[4]").appName("prepareData").getOrCreate()
     val sparkContext = sparkSession.sparkContext
 
+    sparkContext.setLogLevel("WARN")
+
     // For implicit conversions like converting RDDs to DataFrames
     import sparkSession.implicits._
 
@@ -29,6 +31,7 @@ object prepareData extends App {
     val inputFolderName = "C:\\Users\\nik_9\\Desktop\\prova\\indici"
     val tempFolderName = "C:\\Users\\nik_9\\Desktop\\prova\\tempResult"
     val outputFolderName = "C:\\Users\\nik_9\\Desktop\\prova\\result"
+    val folderSeparator = "\\"
 
     val inputFolder = new File(inputFolderName)
 
@@ -47,7 +50,7 @@ object prepareData extends App {
 
         var tuple1 = APILangLinks.callAPI(line, "en", "it")
         val num_traduzioni = tuple1._1
-        val id_pagina_italiana = tuple1._2
+        val id_pagina_tradotta = tuple1._2
         //println(tuple1)
 
         var tuple2 = APIPageView.callAPI(line, "en")
@@ -61,19 +64,18 @@ object prepareData extends App {
         val id_redirect = tuple3._2
         //println(result3)
 
-        Entry(line, num_traduzioni, id_pagina_italiana, num_visualiz_anno, num_visualiz_mesi, byte_dim_page, id_redirect)
+        Entry(line, num_traduzioni, id_pagina_tradotta, num_visualiz_anno, num_visualiz_mesi, byte_dim_page, id_redirect)
       }).persist
 
       //println(result)
 
-      val tempDataFrame = tempResult.toDF("id", "num_traduzioni", "id_pagina_italiana", "num_visualiz_anno", "num_visualiz_mesi", "byte_dim_page", "id_redirect")
+      val tempDataFrame = tempResult.toDF("id", "num_traduzioni", "id_pagina_tradotta", "num_visualiz_anno", "num_visualiz_mesi", "byte_dim_page", "id_redirect")
 
       //tempDataFrame.show(false)
 
       val tempOutputName = inputFileName.drop(inputFolderName.length + 1).dropRight(4)
 
-      //TODO: cambiare il \\ in // ?
-      val tempOutputFolder = tempFolderName + "\\" + tempOutputName
+      val tempOutputFolder = tempFolderName + folderSeparator + tempOutputName
 
       tempOutputFolders = tempOutputFolders :+ tempOutputFolder
 
@@ -84,11 +86,25 @@ object prepareData extends App {
 
     val allTempFiles = DataFrameUtility.collectParquetFilesFromFolders(tempOutputFolders)
 
-    val dataFrameTempFiles = allTempFiles map (n => sparkSession.read.parquet(n))
+    val dataFrameTempFiles = allTempFiles map (tempFile => sparkSession.read.parquet(tempFile))
 
     val notCompressedDataFrame = dataFrameTempFiles.reduce(_ union _)
 
     notCompressedDataFrame.show(false)
+
+    //notCompressedDataFrame.select("id_pagina_tradotta").show(false)
+
+    val col = notCompressedDataFrame.filter("id_pagina_tradotta != ''").select("id_pagina_tradotta")
+
+    col.show(false)
+
+    val translatedIndexes = col.map(row => row.getString(0))
+
+    translatedIndexes.foreach(n => println(n))
+
+    //col.(n => println(n))
+
+    //tempRes.foreach(n => println(n))
 
     val resultDataFrame = notCompressedDataFrame.coalesce(2)
 
