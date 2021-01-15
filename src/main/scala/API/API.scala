@@ -71,6 +71,10 @@ package API {
             try {
               ret = this.parseJSON(result.body)
             }catch{
+              case e:java.util.NoSuchElementException => {
+                ret = (0, "")
+                this.lista_errori=this.lista_errori :+  (url, counter, "Pagina non trovata")
+              }
               case e:Exception => {
                 ret = (0, "")
                 this.lista_errori=this.lista_errori :+  (url, counter, e.getMessage)
@@ -95,7 +99,7 @@ package API {
     def parseJSON(response: String): (Int, String) = {
       val json = ujson.read(response)
       val text = json("parse").obj("text").obj("*").str
-      val di_ref=if(text contains "class=\"redirectText\"" ) URLDecoder.decode(text.split("class=\"redirectText\"")(1).split("href=\"/wiki/")(1).split("\" title=\"")(0), StandardCharsets.UTF_8) else ""
+      val di_ref=if(text contains "class=\"redirectText\"" ) URLDecoder.decode(text.split("class=\"redirectText\"")(1).split("href=\"/wiki/")(1).split("\" title=\"")(0).split("#")(0), StandardCharsets.UTF_8) else ""
 
       (text.getBytes.length, di_ref)
     }

@@ -6,6 +6,8 @@ import API.APIPageView
 import Utilities._
 import org.apache.commons.io.FileUtils
 import java.io._
+import java.net.URLDecoder
+import java.nio.charset.StandardCharsets
 
 //case class perché sono immutabili
 case class EntrySrc(id: String,
@@ -17,7 +19,7 @@ case class EntrySrc(id: String,
                  IDPaginaPrincipale: String)
 
 case class EntryDst(id: String,
-                    IDPaginaTradotta: String,
+                    IDPaginaOriginale: String,
                     numVisualizzazioniAnno: List[Int],
                     numVisualizzazioniMesi: List[Int],
                     numByte: Int,
@@ -26,15 +28,16 @@ case class EntryDst(id: String,
 object prepareData extends App {
   override def main(args: Array[String]) {
 
-    val sparkSession = SparkSession.builder().master("local[4]").appName("prepareData").getOrCreate()
+    val sparkSession = SparkSession.builder().master("local[8]").appName("prepareData").getOrCreate()
     val sparkContext = sparkSession.sparkContext
 
     sparkContext.setLogLevel("WARN")
 
+    val startTime = System.currentTimeMillis()
+
     // For implicit conversions like converting RDDs to DataFrames
     import sparkSession.implicits._
 
-    //TODO: cambiare path
     val inputFolderName = "C:\\Users\\nik_9\\Desktop\\prova\\indici"
     val tempFolderName = "C:\\Users\\nik_9\\Desktop\\prova\\tempResult"
     val outputFolderName = "C:\\Users\\nik_9\\Desktop\\prova\\result"
@@ -109,26 +112,26 @@ object prepareData extends App {
 
         println(counter)
 
-        val tuple1 = APILangLinks.callAPI(line, "it", "en")
+        val tuple1 = APILangLinks.callAPI(URLDecoder.decode(line,  StandardCharsets.UTF_8), "it", "en")
         //val num_traduzioni = tuple1._1
-        val id_pagina_tradotta = tuple1._2
+        val id_pagina_originale = tuple1._2
         //println(tuple1)
 
-        val tuple2 = APIPageView.callAPI(line, "it")
+        val tuple2 = APIPageView.callAPI(URLDecoder.decode(line,  StandardCharsets.UTF_8), "it")
         val num_visualiz_anno = tuple2._1
         val num_visualiz_mesi = tuple2._2
 
-        val tuple3 = APIRedirect.callAPI(line, "it")
+        val tuple3 = APIRedirect.callAPI(URLDecoder.decode(line,  StandardCharsets.UTF_8), "it")
         val byte_dim_page = tuple3._1
         val id_redirect = tuple3._2
 
         counter += 1
 
-        EntryDst(line, id_pagina_tradotta, num_visualiz_anno, num_visualiz_mesi, byte_dim_page, id_redirect)
+        EntryDst(URLDecoder.decode(line,  StandardCharsets.UTF_8), URLDecoder.decode(id_pagina_originale,  StandardCharsets.UTF_8), num_visualiz_anno, num_visualiz_mesi, byte_dim_page, id_redirect)
 
       }).persist
 
-      val tempDataFrameDst = tempResultDst.toDF("id", "id_pagina_tradotta", "num_visualiz_anno", "num_visualiz_mesi", "byte_dim_page", "id_redirect")
+      val tempDataFrameDst = tempResultDst.toDF("id", "id_pagina_originale", "num_visualiz_anno", "num_visualiz_mesi", "byte_dim_page", "id_redirect")
 
       val tempOutputFolderDst = tempFolderName + folderSeparator + "it" + folderSeparator + tempOutputName
 
@@ -169,6 +172,13 @@ object prepareData extends App {
 
     FileUtils.deleteDirectory(new File(outputFolderName + folderSeparator + "it"))
     resultDataFrameDst.write.parquet(outputFolderName + folderSeparator + "it")
+
+    val endTime = System.currentTimeMillis()
+
+    val minutes = (endTime - startTime) / 60000
+    val seconds = ((endTime - startTime) / 1000) % 60
+
+    println("Time: " + minutes + " minutes " + seconds + " seconds")
 
     //ferma anche lo sparkContext
     sparkSession.stop()
