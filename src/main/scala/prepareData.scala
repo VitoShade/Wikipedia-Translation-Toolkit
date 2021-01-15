@@ -18,7 +18,7 @@ case class EntrySrc(id: String,
                  IDPaginaPrincipale: String)
 
 case class EntryDst(id: String,
-                    IDPaginaTradotta: String,
+                    IDPaginaOriginale: String,
                     numVisualizzazioniAnno: List[Int],
                     numVisualizzazioniMesi: List[Int],
                     numByte: Int,
@@ -27,10 +27,12 @@ case class EntryDst(id: String,
 object prepareData extends App {
   override def main(args: Array[String]) {
 
-    val sparkSession = SparkSession.builder().master("local[4]").appName("prepareData").getOrCreate()
+    val sparkSession = SparkSession.builder().master("local[32]").appName("prepareData").getOrCreate()
     val sparkContext = sparkSession.sparkContext
 
     sparkContext.setLogLevel("WARN")
+
+    val startTime = System.currentTimeMillis()
 
     // For implicit conversions like converting RDDs to DataFrames
     import sparkSession.implicits._
@@ -50,7 +52,7 @@ object prepareData extends App {
     //inputFiles.foreach(println)
     inputFiles.foreach(inputFileName => {
 
-      val input = sparkContext.textFile(inputFileName)
+      val input = sparkContext.textFile(inputFileName, 128)
 
       var counter = 0
 
@@ -111,7 +113,7 @@ object prepareData extends App {
 
         val tuple1 = APILangLinks.callAPI(URLDecoder.decode(line,  StandardCharsets.UTF_8), "it", "en")
         //val num_traduzioni = tuple1._1
-        val id_pagina_tradotta = tuple1._2
+        val id_pagina_originale = tuple1._2
         //println(tuple1)
 
         val tuple2 = APIPageView.callAPI(URLDecoder.decode(line,  StandardCharsets.UTF_8), "it")
@@ -124,11 +126,11 @@ object prepareData extends App {
 
         counter += 1
 
-        EntryDst(URLDecoder.decode(line,  StandardCharsets.UTF_8), URLDecoder.decode(id_pagina_tradotta,  StandardCharsets.UTF_8), num_visualiz_anno, num_visualiz_mesi, byte_dim_page, id_redirect)
+        EntryDst(URLDecoder.decode(line,  StandardCharsets.UTF_8), URLDecoder.decode(id_pagina_originale,  StandardCharsets.UTF_8), num_visualiz_anno, num_visualiz_mesi, byte_dim_page, id_redirect)
 
       }).persist
 
-      val tempDataFrameDst = tempResultDst.toDF("id", "id_pagina_tradotta", "num_visualiz_anno", "num_visualiz_mesi", "byte_dim_page", "id_redirect")
+      val tempDataFrameDst = tempResultDst.toDF("id", "id_pagina_originale", "num_visualiz_anno", "num_visualiz_mesi", "byte_dim_page", "id_redirect")
 
       val tempOutputFolderDst = tempFolderName + folderSeparator + "it" + folderSeparator + tempOutputName
 
@@ -169,6 +171,13 @@ object prepareData extends App {
 
     FileUtils.deleteDirectory(new File(outputFolderName + folderSeparator + "it"))
     resultDataFrameDst.write.parquet(outputFolderName + folderSeparator + "it")
+
+    val endTime = System.currentTimeMillis()
+
+    val minutes = (endTime - startTime) / 60000
+    val seconds = ((endTime - startTime) / 1000) % 60
+
+    println("Time: " + minutes + " minutes " + seconds + " seconds")
 
     //ferma anche lo sparkContext
     sparkSession.stop()

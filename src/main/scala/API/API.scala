@@ -8,38 +8,36 @@ package API {
 
   object APILangLinks {
 
-    var lista_errori: Vector[(String, Int, String)] = Vector()
+    var lista_errori: Vector[(String, Vector[(Int, String)])] = Vector()
 
     def callAPI(url: String, sourceLang: String, destLang: String): (Int, String) = {
       var result:scalaj.http.HttpResponse[String] = null
-      var cond = true
-      var ret:(Int, String) = null
+      var cond = false
+      var ret:(Int, String) = (0, "")
       var counter: Int = 0
+      var lista_errori_tmp: Vector[(Int, String)] = Vector()
       //println(url + " pt1")
-      while(cond && (counter < 10)) {
+      while(!cond && (counter < 10)) {
         try {
           result = Http("https://" + URLEncoder.encode(sourceLang, StandardCharsets.UTF_8) +
             ".wikipedia.org/w/api.php?action=parse&page=" + URLEncoder.encode(url, StandardCharsets.UTF_8) + "&format=json&prop=langlinks"
           ).asString
           if (result.is2xx) {
-            cond = false
             try {
               ret = this.parseJSON(result.body, destLang)
+              cond = true
             } catch {
-              case e: Exception => ret = (0, "")
+              case e: Exception => lista_errori_tmp = lista_errori_tmp :+  (counter, e.getMessage)
             }
           }
         }catch{
-          case e:javax.net.ssl.SSLException => {
-            this.lista_errori=this.lista_errori :+  (url, counter, e.getMessage)
-            ret = (0, "")
-          }
-          case e:Exception => {
-            this.lista_errori=this.lista_errori :+  (url, counter, e.getMessage)
-            ret = (0, "")
-          }
+          case _:javax.net.ssl.SSLException => lista_errori_tmp = lista_errori_tmp :+  (counter, "BUG delle JDK 11")
+          case e:Exception => lista_errori_tmp =  lista_errori_tmp :+  (counter, e.getMessage)
         }
         counter = counter + 1
+      }
+      if(!cond){
+        this.lista_errori = this.lista_errori :+ (url, lista_errori_tmp)
       }
       ret
     }
@@ -54,44 +52,36 @@ package API {
 
   object APIRedirect {
 
-    var lista_errori: Vector[(String, Int, String)] = Vector()
+    var lista_errori: Vector[(String, Vector[(Int, String)])] = Vector()
 
     def callAPI(url: String, lang:String): (Int, String) = {
       var result:scalaj.http.HttpResponse[String] = null
-      var cond = true
-      var ret:(Int, String) = null
+      var cond = false
+      var ret:(Int, String) = (0, "")
       var counter: Int = 0
+      var lista_errori_tmp: Vector[(Int, String)] = Vector()
       //println(url + " pt3")
-      while(cond && (counter <10)) {
+      while(!cond && (counter <10)) {
         try {
           result = Http("https://" + URLEncoder.encode(lang, StandardCharsets.UTF_8) +
             ".wikipedia.org/w/api.php?action=parse&page=" + URLEncoder.encode(url, StandardCharsets.UTF_8) + "&prop=text&format=json").asString
           if(result.is2xx) {
-            cond = false
             try {
               ret = this.parseJSON(result.body)
+              cond = true
             }catch{
-              case e:java.util.NoSuchElementException => {
-                ret = (0, "")
-                this.lista_errori=this.lista_errori :+  (url, counter, "Pagina non trovata")
-              }
-              case e:Exception => {
-                ret = (0, "")
-                this.lista_errori=this.lista_errori :+  (url, counter, e.getMessage)
-              }
+              case _:java.util.NoSuchElementException =>  lista_errori_tmp = lista_errori_tmp :+  (counter, "Pagina non trovata")
+              case e:Exception => lista_errori_tmp =  lista_errori_tmp :+  (counter, e.getMessage)
             }
           }
         }catch{
-          case e:javax.net.ssl.SSLException => {
-            this.lista_errori=this.lista_errori :+  (url, counter, e.getMessage)
-            ret = (0, "")
-          }
-          case e:Exception => {
-            this.lista_errori=this.lista_errori :+  (url, counter, e.getMessage)
-            ret = (0, "")
-          }
+          case _:javax.net.ssl.SSLException => lista_errori_tmp = lista_errori_tmp :+  (counter, "BUG delle JDK 11")
+          case e:Exception => lista_errori_tmp = lista_errori_tmp :+  (counter, e.getMessage)
         }
         counter = counter + 1
+      }
+      if(!cond){
+        this.lista_errori = this.lista_errori :+ (url, lista_errori_tmp)
       }
       ret
     }
@@ -99,40 +89,42 @@ package API {
     def parseJSON(response: String): (Int, String) = {
       val json = ujson.read(response)
       val text = json("parse").obj("text").obj("*").str
-      val di_ref=if(text contains "class=\"redirectText\"" ) URLDecoder.decode(text.split("class=\"redirectText\"")(1).split("href=\"/wiki/")(1).split("\" title=\"")(0), StandardCharsets.UTF_8) else ""
+      val di_ref=if(text contains "class=\"redirectText\"" ) URLDecoder.decode(text.split("class=\"redirectText\"")(1).split("href=\"/wiki/")(1).split("\" title=\"")(0).split("#")(0), StandardCharsets.UTF_8) else ""
 
       (text.getBytes.length, di_ref)
     }
   }
 
-  //Se lo mettiamo qui rischiamo di andare in loop infinito perchè se la pagina non esisteva in quel lasso di tempo, allora da 404
   object APIPageView {
 
-    var lista_errori: Vector[(String, String)] = Vector()
+    var lista_errori: Vector[(String, Vector[(Int, String)])] = Vector()
 
     def callAPI(url: String, lang:String): (List[Int], List[Int]) = {
       var result:scalaj.http.HttpResponse[String] = null
-      var ret:(List[Int], List[Int]) = null
+      var cond = false
+      var ret:(List[Int], List[Int]) = (List(0, 0, 0), List(0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0))
+      var counter: Int = 0
+      var lista_errori_tmp: Vector[(Int, String)] = Vector()
       //println(url + " pt2")
-      try {
-        result = Http("https://wikimedia.org/api/rest_v1/metrics/pageviews/per-article/" + URLEncoder.encode(lang, StandardCharsets.UTF_8) +
-          ".wikipedia/all-access/all-agents/" + URLEncoder.encode(url, StandardCharsets.UTF_8) + "/monthly/20180101/20210101").asString
+      while(!cond && (counter < 10)) {
+        try {
+          result = Http("https://wikimedia.org/api/rest_v1/metrics/pageviews/per-article/" + URLEncoder.encode(lang, StandardCharsets.UTF_8) +
+            ".wikipedia/all-access/all-agents/" + URLEncoder.encode(url, StandardCharsets.UTF_8) + "/monthly/20180101/20210101").asString
 
-        if(result.is2xx) {
-          ret=this.parseJSON(result.body)
-        } else{
-          this.lista_errori=this.lista_errori :+  (url, result.body)
-          ret=(List(0,0,0), List(0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0))
+          if (result.is2xx) {
+            ret = this.parseJSON(result.body)
+            cond = true
+          } else {
+            lista_errori_tmp = lista_errori_tmp :+  (counter, result.body)
+          }
+        } catch {
+          case e: javax.net.ssl.SSLException => lista_errori_tmp = lista_errori_tmp :+  (counter, e.getMessage)
+          case e: Exception => lista_errori_tmp = lista_errori_tmp :+  (counter, e.getMessage)
         }
-      }catch{
-        case e:javax.net.ssl.SSLException => {
-          this.lista_errori=this.lista_errori :+  (url, e.getMessage)
-          ret=(List(0,0,0), List(0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0))
-        }
-        case e:Exception => {
-          this.lista_errori=this.lista_errori :+  (url, e.getMessage)
-          ret=(List(0,0,0), List(0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0))
-        }
+        counter = counter + 1
+      }
+      if(!cond){
+        this.lista_errori = this.lista_errori :+ (url, lista_errori_tmp)
       }
       ret
     }
