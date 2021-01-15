@@ -12,19 +12,20 @@ package API {
 
     def callAPI(url: String, sourceLang: String, destLang: String): (Int, String) = {
       var result:scalaj.http.HttpResponse[String] = null
-      var cond = true
+      var cond = false
       var ret:(Int, String) = null
       var counter: Int = 0
       //println(url + " pt1")
-      while(cond && (counter < 10)) {
+      while(!cond && (counter < 10)) {
         try {
           result = Http("https://" + URLEncoder.encode(sourceLang, StandardCharsets.UTF_8) +
             ".wikipedia.org/w/api.php?action=parse&page=" + URLEncoder.encode(url, StandardCharsets.UTF_8) + "&format=json&prop=langlinks"
           ).asString
           if (result.is2xx) {
-            cond = false
+
             try {
               ret = this.parseJSON(result.body, destLang)
+              cond = true
             } catch {
               case e: Exception => ret = (0, "")
             }
@@ -58,18 +59,20 @@ package API {
 
     def callAPI(url: String, lang:String): (Int, String) = {
       var result:scalaj.http.HttpResponse[String] = null
-      var cond = true
+      //var cond = true
+      var cond = false
       var ret:(Int, String) = null
       var counter: Int = 0
       //println(url + " pt3")
-      while(cond && (counter <10)) {
+      while(!cond && (counter <10)) {
         try {
           result = Http("https://" + URLEncoder.encode(lang, StandardCharsets.UTF_8) +
             ".wikipedia.org/w/api.php?action=parse&page=" + URLEncoder.encode(url, StandardCharsets.UTF_8) + "&prop=text&format=json").asString
           if(result.is2xx) {
-            cond = false
+
             try {
               ret = this.parseJSON(result.body)
+              cond = true
             }catch{
               case e:java.util.NoSuchElementException => {
                 ret = (0, "")
@@ -112,27 +115,33 @@ package API {
 
     def callAPI(url: String, lang:String): (List[Int], List[Int]) = {
       var result:scalaj.http.HttpResponse[String] = null
+      var cond = false
       var ret:(List[Int], List[Int]) = null
+      var counter: Int = 0
       //println(url + " pt2")
-      try {
-        result = Http("https://wikimedia.org/api/rest_v1/metrics/pageviews/per-article/" + URLEncoder.encode(lang, StandardCharsets.UTF_8) +
-          ".wikipedia/all-access/all-agents/" + URLEncoder.encode(url, StandardCharsets.UTF_8) + "/monthly/20180101/20210101").asString
+      while(!cond && (counter < 10)) {
+        try {
+          result = Http("https://wikimedia.org/api/rest_v1/metrics/pageviews/per-article/" + URLEncoder.encode(lang, StandardCharsets.UTF_8) +
+            ".wikipedia/all-access/all-agents/" + URLEncoder.encode(url, StandardCharsets.UTF_8) + "/monthly/20180101/20210101").asString
 
-        if(result.is2xx) {
-          ret=this.parseJSON(result.body)
-        } else{
-          this.lista_errori=this.lista_errori :+  (url, result.body)
-          ret=(List(0,0,0), List(0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0))
+          if (result.is2xx) {
+            ret = this.parseJSON(result.body)
+            cond = true
+          } else {
+            this.lista_errori = this.lista_errori :+ (url, result.body)
+            ret = (List(0, 0, 0), List(0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0))
+          }
+        } catch {
+          case e: javax.net.ssl.SSLException => {
+            this.lista_errori = this.lista_errori :+ (url, e.getMessage)
+            ret = (List(0, 0, 0), List(0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0))
+          }
+          case e: Exception => {
+            this.lista_errori = this.lista_errori :+ (url, e.getMessage)
+            ret = (List(0, 0, 0), List(0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0))
+          }
         }
-      }catch{
-        case e:javax.net.ssl.SSLException => {
-          this.lista_errori=this.lista_errori :+  (url, e.getMessage)
-          ret=(List(0,0,0), List(0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0))
-        }
-        case e:Exception => {
-          this.lista_errori=this.lista_errori :+  (url, e.getMessage)
-          ret=(List(0,0,0), List(0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0))
-        }
+        counter = counter + 1
       }
       ret
     }

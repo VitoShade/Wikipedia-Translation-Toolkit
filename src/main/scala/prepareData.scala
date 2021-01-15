@@ -28,7 +28,7 @@ case class EntryDst(id: String,
 object prepareData extends App {
   override def main(args: Array[String]) {
 
-    val sparkSession = SparkSession.builder().master("local[8]").appName("prepareData").getOrCreate()
+    val sparkSession = SparkSession.builder().master("local[20]").appName("prepareData").getOrCreate()
     val sparkContext = sparkSession.sparkContext
 
     sparkContext.setLogLevel("WARN")
@@ -53,7 +53,7 @@ object prepareData extends App {
     //inputFiles.foreach(println)
     inputFiles.foreach(inputFileName => {
 
-      val input = sparkContext.textFile(inputFileName)
+      val input = sparkContext.textFile(inputFileName, 32)
 
       var counter = 0
 
