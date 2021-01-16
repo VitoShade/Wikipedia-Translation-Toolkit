@@ -6,7 +6,7 @@ import scalaj.http.Http
 
 package API {
 
-  class APILangLinks() {
+  object APILangLinks {
 
     var lista_errori: Vector[(String, Vector[(Int, String)])] = Vector()
 
@@ -16,6 +16,10 @@ package API {
 
     def obtainErrorDetails(): Vector[(String, Vector[(Int, String)])] = {
       this.lista_errori
+    }
+
+    def resetErrorList(): Unit = {
+      this.lista_errori = Vector()
     }
 
     def callAPI(url: String, sourceLang: String, destLang: String): (Int, String) = {
@@ -60,7 +64,7 @@ package API {
     }
   }
 
-  class APIRedirect() {
+  object APIRedirect {
 
     var lista_errori: Vector[(String, Vector[(Int, String)])] = Vector()
 
@@ -70,6 +74,10 @@ package API {
 
     def obtainErrorDetails(): Vector[(String, Vector[(Int, String)])] = {
       this.lista_errori
+    }
+
+    def resetErrorList(): Unit = {
+      this.lista_errori = Vector()
     }
 
     def callAPI(url: String, lang:String): (Int, String) = {
@@ -116,7 +124,7 @@ package API {
     }
   }
 
-  class APIPageView() {
+  object APIPageView {
 
     var lista_errori: Vector[(String, Vector[(Int, String)])] = Vector()
 
@@ -128,10 +136,14 @@ package API {
       this.lista_errori
     }
 
-    def callAPI(url: String, lang:String): (List[Int], List[Int]) = {
+    def resetErrorList(): Unit = {
+      this.lista_errori = Vector()
+    }
+
+    def callAPI(url: String, lang:String): (Array[Int], Array[Int]) = {
       var result:scalaj.http.HttpResponse[String] = null
       var cond = false
-      var ret:(List[Int], List[Int]) = (List(0, 0, 0), List(0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0))
+      var ret:(Array[Int], Array[Int]) = (Array(0, 0, 0), Array(0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0))
       var counter: Int = 0
       var lista_errori_tmp: Vector[(Int, String)] = Vector()
       //println(url + " pt2")
@@ -158,7 +170,7 @@ package API {
       ret
     }
 
-    def parseJSON(response: String): (List[Int], List[Int]) = {
+    def parseJSON(response: String): (Array[Int], Array[Int]) = {
       val json = ujson.read(response)
       //val views: List[Int] = json("items").arr.map(item => item.obj("views").toString.toInt).toList
       val mappa=json("items").arr.map(item => item.obj("timestamp").str.dropRight(4) -> item.obj("views").toString.toInt).toMap
@@ -166,7 +178,7 @@ package API {
       val filtrato = anni.map(anno => mappa.filterKeys(_.dropRight(2) contains anno).values.sum)
       var mesi = Array(0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0)
       mappa.filterKeys(_.dropRight(2) contains "2020").foreach(item => mesi(item._1.slice(4,6).toInt-1) = item._2)
-      (filtrato, mesi.toList)
+      (filtrato.toArray, mesi)
     }
 
   }
