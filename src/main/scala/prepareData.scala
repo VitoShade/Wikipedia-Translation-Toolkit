@@ -37,10 +37,11 @@ object prepareData extends App {
     // For implicit conversions like converting RDDs to DataFrames
     import sparkSession.implicits._
 
-    val inputFolderName = "/Users/stefano/IdeaProjects/Wikipedia-Translation-Toolkit/src/main/files/indici"
-    val tempFolderName = "/Users/stefano/IdeaProjects/Wikipedia-Translation-Toolkit/src/main/files/tempResult"
-    val outputFolderName = "/Users/stefano/IdeaProjects/Wikipedia-Translation-Toolkit/src/main/files/result"
-    val folderSeparator = "/"
+    val inputFolderName   = "/Users/stefano/IdeaProjects/Wikipedia-Translation-Toolkit/src/main/files/indici"
+    val tempFolderName    = "/Users/stefano/IdeaProjects/Wikipedia-Translation-Toolkit/src/main/files/tempResult"
+    val outputFolderName  = "/Users/stefano/IdeaProjects/Wikipedia-Translation-Toolkit/src/main/files/result"
+    val errorFolderName   = "/Users/stefano/IdeaProjects/Wikipedia-Translation-Toolkit/src/main/files/error"
+    val folderSeparator   = "/"
 
     val inputFolder = new File(inputFolderName)
 
@@ -49,29 +50,35 @@ object prepareData extends App {
     var tempOutputFoldersSrc = Array[String]()
     var tempOutputFoldersDst = Array[String]()
 
+    FileUtils.deleteDirectory(new File(tempFolderName))
+    FileUtils.deleteDirectory(new File(errorFolderName))
+
     //inputFiles.foreach(println)
     inputFiles.foreach(inputFileName => {
 
-      val input = sparkContext.textFile(inputFileName, 128)
+      val input = sparkContext.textFile(inputFileName, 50)
 
       var counter = 0
+      val APILangLinksInstance = new APILangLinks()
+      val APIPageViewInstance = new APIPageView()
+      val APIRedirectInstance = new APIRedirect()
 
       val tempResultSrc = input.map(line => {
 
         println(counter)
 
-        val tuple1 = APILangLinks.callAPI(line, "en", "it")
+        val tuple1 = APILangLinksInstance.callAPI(line, "en", "it")
         val num_traduzioni = tuple1._1
         val id_pagina_tradotta = tuple1._2
         //println(tuple1)
 
-        val tuple2 = APIPageView.callAPI(line, "en")
+        val tuple2 = APIPageViewInstance.callAPI(line, "en")
         val num_visualiz_anno = tuple2._1
         val num_visualiz_mesi = tuple2._2
         //println(line + "   " + tuple2)
         //println(num_visualiz_anno)
 
-        val tuple3 = APIRedirect.callAPI(line, "en")
+        val tuple3 = APIRedirectInstance.callAPI(line, "en")
         val byte_dim_page = tuple3._1
         val id_redirect = tuple3._2
         //println(result3)
@@ -94,7 +101,6 @@ object prepareData extends App {
 
       tempOutputFoldersSrc = tempOutputFoldersSrc :+ tempOutputFolderSrc
 
-      FileUtils.deleteDirectory(new File(tempOutputFolderSrc))
       tempDataFrameSrc.write.parquet(tempOutputFolderSrc)
 
       //recupero colonna ID pagine tradotte
@@ -106,21 +112,24 @@ object prepareData extends App {
       val translatedID = dataFrameTranslatedID.map(row => row.getString(0))
 
       counter = 0
+      val APILangLinksInstanceTranslated = new APILangLinks()
+      val APIPageViewInstanceTranslated = new APIPageView()
+      val APIRedirectInstanceTranslated = new APIRedirect()
 
       val tempResultDst = translatedID.map(line => {
 
         println(counter)
 
-        val tuple1 = APILangLinks.callAPI(URLDecoder.decode(line,  StandardCharsets.UTF_8), "it", "en")
+        val tuple1 = APILangLinksInstanceTranslated.callAPI(URLDecoder.decode(line,  StandardCharsets.UTF_8), "it", "en")
         //val num_traduzioni = tuple1._1
         val id_pagina_originale = tuple1._2
         //println(tuple1)
 
-        val tuple2 = APIPageView.callAPI(URLDecoder.decode(line,  StandardCharsets.UTF_8), "it")
+        val tuple2 = APIPageViewInstanceTranslated.callAPI(URLDecoder.decode(line,  StandardCharsets.UTF_8), "it")
         val num_visualiz_anno = tuple2._1
         val num_visualiz_mesi = tuple2._2
 
-        val tuple3 = APIRedirect.callAPI(URLDecoder.decode(line,  StandardCharsets.UTF_8), "it")
+        val tuple3 = APIRedirectInstanceTranslated.callAPI(URLDecoder.decode(line,  StandardCharsets.UTF_8), "it")
         val byte_dim_page = tuple3._1
         val id_redirect = tuple3._2
 
@@ -136,13 +145,23 @@ object prepareData extends App {
 
       tempOutputFoldersDst = tempOutputFoldersDst :+ tempOutputFolderDst
 
-      FileUtils.deleteDirectory(new File(tempOutputFolderDst))
       tempDataFrameDst.write.parquet(tempOutputFolderDst)
 
-      println("Lista errori APILangLinks: " + APILangLinks.lista_errori)
-      println("Lista errori APIPageView:  " + APIPageView.lista_errori)
-      println("Lista errori APIRedirect:  " + APIRedirect.lista_errori)
+      this.writeFileID(errorFolderName + folderSeparator + "errorLangLinks.txt", APILangLinksInstance.obtainErrorID())
+      this.writeFileID(errorFolderName + folderSeparator + "errorViewInstance.txt", APIPageViewInstance.obtainErrorID())
+      this.writeFileID(errorFolderName + folderSeparator + "errorRedirect.txt", APIRedirectInstance.obtainErrorID())
 
+      this.writeFileID(errorFolderName + folderSeparator + "errorLangLinksTranslated.txt", APILangLinksInstanceTranslated.obtainErrorID())
+      this.writeFileID(errorFolderName + folderSeparator + "errorViewInstanceTranslated.txt", APIPageViewInstanceTranslated.obtainErrorID())
+      this.writeFileID(errorFolderName + folderSeparator + "errorRedirectTranslated.txt", APIRedirectInstanceTranslated.obtainErrorID())
+
+      this.writeFileErrors(errorFolderName + folderSeparator + "errorLangLinksDetails.txt", APILangLinksInstance.obtainErrorDetails())
+      this.writeFileErrors(errorFolderName + folderSeparator + "errorViewInstanceDetails.txt", APIPageViewInstance.obtainErrorDetails())
+      this.writeFileErrors(errorFolderName + folderSeparator + "errorRedirectDetails.txt", APIRedirectInstance.obtainErrorDetails())
+
+      this.writeFileErrors(errorFolderName + folderSeparator + "errorLangLinksTranslatedDetails.txt", APILangLinksInstanceTranslated.obtainErrorDetails())
+      this.writeFileErrors(errorFolderName + folderSeparator + "errorViewInstanceTranslatedDetails.txt", APIPageViewInstanceTranslated.obtainErrorDetails())
+      this.writeFileErrors(errorFolderName + folderSeparator + "errorRedirectTranslatedDetails.txt", APIRedirectInstanceTranslated.obtainErrorDetails())
     })
 
     val allTempFilesSrc = DataFrameUtility.collectParquetFilesFromFolders(tempOutputFoldersSrc)
@@ -181,5 +200,25 @@ object prepareData extends App {
 
     //ferma anche lo sparkContext
     sparkSession.stop()
+  }
+
+  def writeFileID(filePath:String, listID:Vector[String]): Unit = {
+    val file = new File(filePath)
+    if(!file.exists){
+      file.createNewFile()
+    }
+    val bw = new BufferedWriter(new FileWriter(file, true))
+    listID.foreach( id => bw.write(id + "\n"))
+    bw.close()
+  }
+
+  def writeFileErrors(filePath:String, listErrors:Vector[(String, Vector[(Int, String)])]): Unit = {
+    val file = new File(filePath)
+    if(!file.exists){
+      file.createNewFile()
+    }
+    val bw = new BufferedWriter(new FileWriter(file, true))
+    listErrors.foreach( ErrorTuple => bw.write(ErrorTuple._1 + ": " + ErrorTuple._2.map(tuple => "(" + tuple._1 + " , " + tuple._2  + ")" + "\t") + "\n"))
+    bw.close()
   }
 }

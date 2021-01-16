@@ -6,9 +6,17 @@ import scalaj.http.Http
 
 package API {
 
-  object APILangLinks {
+  class APILangLinks() {
 
     var lista_errori: Vector[(String, Vector[(Int, String)])] = Vector()
+
+    def obtainErrorID(): Vector[String] = {
+      this.lista_errori.map(el => el._1)
+    }
+
+    def obtainErrorDetails(): Vector[(String, Vector[(Int, String)])] = {
+      this.lista_errori
+    }
 
     def callAPI(url: String, sourceLang: String, destLang: String): (Int, String) = {
       var result:scalaj.http.HttpResponse[String] = null
@@ -29,6 +37,8 @@ package API {
             } catch {
               case e: Exception => lista_errori_tmp = lista_errori_tmp :+  (counter, e.getMessage)
             }
+          }else{
+            lista_errori_tmp = lista_errori_tmp :+  (counter, "codice risposta diverso da 2xx")
           }
         }catch{
           case _:javax.net.ssl.SSLException => lista_errori_tmp = lista_errori_tmp :+  (counter, "BUG delle JDK 11")
@@ -50,9 +60,17 @@ package API {
     }
   }
 
-  object APIRedirect {
+  class APIRedirect() {
 
     var lista_errori: Vector[(String, Vector[(Int, String)])] = Vector()
+
+    def obtainErrorID(): Vector[String] = {
+      this.lista_errori.map(el => el._1)
+    }
+
+    def obtainErrorDetails(): Vector[(String, Vector[(Int, String)])] = {
+      this.lista_errori
+    }
 
     def callAPI(url: String, lang:String): (Int, String) = {
       var result:scalaj.http.HttpResponse[String] = null
@@ -73,6 +91,9 @@ package API {
               case _:java.util.NoSuchElementException =>  lista_errori_tmp = lista_errori_tmp :+  (counter, "Pagina non trovata")
               case e:Exception => lista_errori_tmp =  lista_errori_tmp :+  (counter, e.getMessage)
             }
+          }
+          else{
+            lista_errori_tmp = lista_errori_tmp :+  (counter, "codice risposta diverso da 2xx")
           }
         }catch{
           case _:javax.net.ssl.SSLException => lista_errori_tmp = lista_errori_tmp :+  (counter, "BUG delle JDK 11")
@@ -95,9 +116,17 @@ package API {
     }
   }
 
-  object APIPageView {
+  class APIPageView() {
 
     var lista_errori: Vector[(String, Vector[(Int, String)])] = Vector()
+
+    def obtainErrorID(): Vector[String] = {
+      this.lista_errori.map(el => el._1)
+    }
+
+    def obtainErrorDetails(): Vector[(String, Vector[(Int, String)])] = {
+      this.lista_errori
+    }
 
     def callAPI(url: String, lang:String): (List[Int], List[Int]) = {
       var result:scalaj.http.HttpResponse[String] = null
@@ -115,7 +144,7 @@ package API {
             ret = this.parseJSON(result.body)
             cond = true
           } else {
-            lista_errori_tmp = lista_errori_tmp :+  (counter, result.body)
+            lista_errori_tmp = lista_errori_tmp :+  (counter, "codice risposta diverso da 2xx")
           }
         } catch {
           case e: javax.net.ssl.SSLException => lista_errori_tmp = lista_errori_tmp :+  (counter, e.getMessage)
