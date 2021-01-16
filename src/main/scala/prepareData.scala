@@ -50,6 +50,8 @@ object prepareData extends App {
     var tempOutputFoldersSrc = Array[String]()
     var tempOutputFoldersDst = Array[String]()
 
+    FileUtils.deleteDirectory(new File(tempFolderName))
+
     //inputFiles.foreach(println)
     inputFiles.foreach(inputFileName => {
 
@@ -95,7 +97,6 @@ object prepareData extends App {
 
       tempOutputFoldersSrc = tempOutputFoldersSrc :+ tempOutputFolderSrc
 
-      FileUtils.deleteDirectory(new File(tempOutputFolderSrc))
       tempDataFrameSrc.write.parquet(tempOutputFolderSrc)
 
       //recupero colonna ID pagine tradotte
@@ -137,7 +138,6 @@ object prepareData extends App {
 
       tempOutputFoldersDst = tempOutputFoldersDst :+ tempOutputFolderDst
 
-      FileUtils.deleteDirectory(new File(tempOutputFolderDst))
       tempDataFrameDst.write.parquet(tempOutputFolderDst)
 
       println("Lista errori APILangLinks: " + APILangLinks.lista_errori)
