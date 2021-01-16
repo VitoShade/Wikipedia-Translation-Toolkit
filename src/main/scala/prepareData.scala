@@ -55,7 +55,7 @@ object prepareData extends App {
     //inputFiles.foreach(println)
     inputFiles.foreach(inputFileName => {
 
-      val input = sparkContext.textFile(inputFileName, 32)
+      val input = sparkContext.textFile(inputFileName, 60)
 
       var counter = 0
 
@@ -154,7 +154,13 @@ object prepareData extends App {
 
     notCompressedDataFrameSrc.show(false)
 
-    val resultDataFrameSrc = notCompressedDataFrameSrc.coalesce(2)
+    var numPartitionsSrc = tempOutputFoldersSrc.length / 2
+
+    if(numPartitionsSrc < 1)
+      numPartitionsSrc = 1
+
+    //una partizione ogni 2 file di input
+    val resultDataFrameSrc = notCompressedDataFrameSrc.coalesce(numPartitionsSrc)
 
     FileUtils.deleteDirectory(new File(outputFolderName + folderSeparator + "en"))
     resultDataFrameSrc.write.parquet(outputFolderName + folderSeparator + "en")
@@ -168,7 +174,13 @@ object prepareData extends App {
 
     notCompressedDataFrameDst.show(false)
 
-    val resultDataFrameDst = notCompressedDataFrameDst.coalesce(2)
+    var numPartitionsDst = numPartitionsSrc / 4
+
+    if(numPartitionsDst < 1)
+      numPartitionsDst = 1
+
+    //un quarto delle partizioni rispetto alla lingua di partenza
+    val resultDataFrameDst = notCompressedDataFrameDst.coalesce(numPartitionsDst)
 
     FileUtils.deleteDirectory(new File(outputFolderName + folderSeparator + "it"))
     resultDataFrameDst.write.parquet(outputFolderName + folderSeparator + "it")
