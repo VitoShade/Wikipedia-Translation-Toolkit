@@ -32,45 +32,46 @@ object analyseData extends App {
 
     val inputFolders = Array(inputFolderName + folderSeparator + "en")
 
-    val allInputFolders = DataFrameUtility.collectParquetFilesFromFolders(inputFolders)
+    /*val allInputFolders = DataFrameUtility.collectParquetFilesFromFolders(inputFolders)
 
     val dataFrameFilesSrc = allInputFolders map (tempFile => sparkSession.read.parquet(tempFile))
 
-    val dataFrameSrc = dataFrameFilesSrc.reduce(_ union _)
+    val dataFrameSrc = dataFrameFilesSrc.reduce(_ union _)*/
 
     //dataFrameSrc.show(false)
 
     //val inputRDD = dataFrameSrc.rdd
 
-    //dataFrameSrc.select("num_visualiz_anno","num_visualiz_mesi","id_redirect").groupBy("id_redirect").count().show(false)
-    /*dataFrameSrc.
-      filter("id_redirect != ''").
-      select("num_visualiz_anno","num_visualiz_mesi","id_redirect").
-      groupBy("id_redirect").
-      count().
-      show(false)*/
-
-    val dataFrameRedirect = dataFrameSrc.
+    /*val dataFrameRedirect = dataFrameSrc.
       filter("id_redirect != ''").
       //select("num_visualiz_anno","num_visualiz_mesi","id_redirect")
       select("num_visualiz_anno","id_redirect")
 
     dataFrameRedirect.show(false)
 
-    val prova = dataFrameRedirect.groupBy("id_redirect").agg(Summarizer.sum($"num_visualiz_anno"))
+    val prova = dataFrameRedirect.groupBy($"id_redirect").agg(Summarizer.sum($"num_visualiz_anno").alias("num_visualiz_anno"))
 
-    prova.show()
+    prova.show()*/
 
-    //println(dataFrameRedirect.first().getAs("id_redirect"))
-    //val res = dataFrameRedirect.reduce((x:Row("num_visualiz_anno","id_redirect"),y:Row)=>Row(x.getAs("id_redirect"), x.getAs("num_visualiz_anno")))
-    //val res = dataFrameRedirect.groupBy("id_redirect").agg(($"num_visualiz_anno"))
+    val df = sparkSession.createDataFrame(Seq(
+      (1, org.apache.spark.ml.linalg.Vectors.dense(0,0,5)),
+      (1, org.apache.spark.ml.linalg.Vectors.dense(4,0,1)),
+      (1, org.apache.spark.ml.linalg.Vectors.dense(1,2,1)),
+      (2, org.apache.spark.ml.linalg.Vectors.dense(7,5,0)),
+      (2, org.apache.spark.ml.linalg.Vectors.dense(3,3,4)),
+      (3, org.apache.spark.ml.linalg.Vectors.dense(0,8,1)),
+      (3, org.apache.spark.ml.linalg.Vectors.dense(0,0,1)),
+      (3, org.apache.spark.ml.linalg.Vectors.dense(7,7,7)))
+    ).toDF("id", "vec")
 
-    //println(res)
+    df.show(false)
 
+    println(df)
 
-    //dataFrameRedirect.withColumn()
+    val res = df.groupBy($"id")
+      .agg(Summarizer.sum($"vec").alias("vec"))
 
-    //dataFrameSrc.select("num_visualiz_anno","num_visualiz_mesi","id_redirect").orderBy(desc("id_redirect")).show(false)
+    res.show(false)
 
 
 
