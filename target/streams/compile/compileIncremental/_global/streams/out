@@ -22,7 +22,7 @@
 [debug] compilation cycle 1
 [info] compiling 1 Scala source to C:\Users\nik_9\IdeaProjects\Wikipedia-Translation-Toolkit\target\scala-2.12\classes ...
 [debug] Getting org.scala-sbt:compiler-bridge_2.12:1.4.4:compile for Scala 2.12.12
-[debug] [zinc] Running cached compiler 7a1c52b for Scala compiler version 2.12.12
+[debug] [zinc] Running cached compiler 281ad581 for Scala compiler version 2.12.12
 [debug] [zinc] The Scala compiler is invoked with:
 [debug] 	-bootclasspath
 [debug] 	C:\Users\nik_9\.sbt\boot\scala-2.12.12\lib\scala-library.jar
@@ -34,5 +34,5 @@
 [debug] Final step, transitive dependencies:
 [debug] 	Set()
 [debug] No classes were invalidated.
-[debug] Scala compilation took 0.874274 s
+[debug] Scala compilation took 0.6516462 s
 [info] done compiling
