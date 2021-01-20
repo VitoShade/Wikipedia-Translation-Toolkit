@@ -1,8 +1,9 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <project version="4">
   <component name="ScalaCompilerConfiguration">
-    <profile name="sbt 1" modules="Wikipedia-Translation-Toolkit,wikipedia-translation-toolkit">
+    <profile name="sbt 1" modules="wikipedia-translation-toolkit">
       <option name="postfixOps" value="true" />
     </profile>
+    <profile name="sbt 2" modules="Wikipedia-Translation-Toolkit" />
   </component>
 </project>

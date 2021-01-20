@@ -16,7 +16,7 @@ import org.apache.spark.sql.functions.desc
 
 
 object showData extends App {
-  override def main(args: Array[String]): Unit = {
+  override def main(args: Array[String]) {
 
 
     val sparkSession = SparkSession.builder().master("local[*]").appName("prepareData").getOrCreate()

@@ -11,15 +11,15 @@ import java.nio.charset.StandardCharsets
 case class EntrySrc(id: String,
                  numTraduzioni: Int,
                  IDPaginaTradotta: String,
-                 numVisualizzazioniAnno: Array[Int],
-                 numVisualizzazioniMesi: Array[Int],
+                 numVisualizzazioniAnno: Vector[Int],
+                 numVisualizzazioniMesi: Vector[Int],
                  numByte: Int,
                  IDPaginaPrincipale: String)
 
 case class EntryDst(id: String,
                     IDPaginaOriginale: String,
-                    numVisualizzazioniAnno: Array[Int],
-                    numVisualizzazioniMesi: Array[Int],
+                    numVisualizzazioniAnno: Vector[Int],
+                    numVisualizzazioniMesi: Vector[Int],
                     numByte: Int,
                     IDPaginaPrincipale: String)
 
@@ -82,7 +82,7 @@ object prepareData extends App {
 
         counter += 1
 
-        EntrySrc(line, num_traduzioni, id_pagina_tradotta, num_visualiz_anno, num_visualiz_mesi, byte_dim_page, id_redirect)
+        EntrySrc(line, num_traduzioni, id_pagina_tradotta, num_visualiz_anno.toVector, num_visualiz_mesi.toVector, byte_dim_page, id_redirect)
 
       }).persist
 
@@ -141,7 +141,7 @@ object prepareData extends App {
 
         counter += 1
 
-        EntryDst(line, id_pagina_originale, num_visualiz_anno, num_visualiz_mesi, byte_dim_page, id_redirect)
+        EntryDst(line, id_pagina_originale, num_visualiz_anno.toVector, num_visualiz_mesi.toVector, byte_dim_page, id_redirect)
 
       }).persist
 
