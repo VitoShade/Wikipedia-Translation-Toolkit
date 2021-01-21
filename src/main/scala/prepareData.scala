@@ -49,7 +49,8 @@ object prepareData extends App {
     var tempOutputFoldersDst = Array[String]()
 
     FileUtils.deleteDirectory(new File(tempFolderName))
-    FileUtils.cleanDirectory(new File(errorFolderName))
+    FileUtils.deleteDirectory(new File(outputFolderName))
+    FileUtils.forceMkdir(new File(errorFolderName))
 
     //inputFiles.foreach(println)
     inputFiles.foreach(inputFileName => {
@@ -64,7 +65,7 @@ object prepareData extends App {
 
         val tuple1 = APILangLinks.callAPI(line, "en", "it")
         val num_traduzioni = tuple1._1
-        val id_pagina_tradotta = tuple1._2
+        val id_pagina_tradotta = URLDecoder.decode(tuple1._2,  StandardCharsets.UTF_8)
         //println(tuple1)
 
         val tuple2 = APIPageView.callAPI(line, "en")
@@ -99,11 +100,11 @@ object prepareData extends App {
       tempDataFrameSrc.write.parquet(tempOutputFolderSrc)
 
       this.writeFileID(errorFolderName + folderSeparator + "errorLangLinks.txt",    APILangLinks.obtainErrorID())
-      this.writeFileID(errorFolderName + folderSeparator + "errorViewInstance.txt", APIPageView.obtainErrorID())
+      this.writeFileID(errorFolderName + folderSeparator + "errorView.txt", APIPageView.obtainErrorID())
       this.writeFileID(errorFolderName + folderSeparator + "errorRedirect.txt",     APIRedirect.obtainErrorID())
 
       this.writeFileErrors(errorFolderName + folderSeparator + "errorLangLinksDetails.txt",     APILangLinks.obtainErrorDetails())
-      this.writeFileErrors(errorFolderName + folderSeparator + "errorViewInstanceDetails.txt",  APIPageView.obtainErrorDetails())
+      this.writeFileErrors(errorFolderName + folderSeparator + "errorViewDetails.txt",  APIPageView.obtainErrorDetails())
       this.writeFileErrors(errorFolderName + folderSeparator + "errorRedirectDetails.txt",      APIRedirect.obtainErrorDetails())
 
       APILangLinks.resetErrorList()
@@ -124,22 +125,22 @@ object prepareData extends App {
 
         println(counter)
 
-        val tuple1 = APILangLinks.callAPI(URLDecoder.decode(line,  StandardCharsets.UTF_8), "it", "en")
+        val tuple1 = APILangLinks.callAPI(line, "it", "en")
         //val num_traduzioni = tuple1._1
-        val id_pagina_originale = tuple1._2
+        val id_pagina_originale = URLDecoder.decode(tuple1._2,  StandardCharsets.UTF_8)
         //println(tuple1)
 
-        val tuple2 = APIPageView.callAPI(URLDecoder.decode(line,  StandardCharsets.UTF_8), "it")
+        val tuple2 = APIPageView.callAPI(line, "it")
         val num_visualiz_anno = tuple2._1
         val num_visualiz_mesi = tuple2._2
 
-        val tuple3 = APIRedirect.callAPI(URLDecoder.decode(line,  StandardCharsets.UTF_8), "it")
+        val tuple3 = APIRedirect.callAPI(line, "it")
         val byte_dim_page = tuple3._1
         val id_redirect = tuple3._2
 
         counter += 1
 
-        EntryDst(URLDecoder.decode(line,  StandardCharsets.UTF_8), URLDecoder.decode(id_pagina_originale,  StandardCharsets.UTF_8), num_visualiz_anno, num_visualiz_mesi, byte_dim_page, id_redirect)
+        EntryDst(line, id_pagina_originale, num_visualiz_anno, num_visualiz_mesi, byte_dim_page, id_redirect)
 
       }).persist
 
@@ -152,11 +153,11 @@ object prepareData extends App {
       tempDataFrameDst.write.parquet(tempOutputFolderDst)
 
       this.writeFileID(errorFolderName + folderSeparator + "errorLangLinksTranslated.txt",    APILangLinks.obtainErrorID())
-      this.writeFileID(errorFolderName + folderSeparator + "errorViewInstanceTranslated.txt", APIPageView.obtainErrorID())
+      this.writeFileID(errorFolderName + folderSeparator + "errorViewTranslated.txt", APIPageView.obtainErrorID())
       this.writeFileID(errorFolderName + folderSeparator + "errorRedirectTranslated.txt",     APIRedirect.obtainErrorID())
 
       this.writeFileErrors(errorFolderName + folderSeparator + "errorLangLinksTranslatedDetails.txt",     APILangLinks.obtainErrorDetails())
-      this.writeFileErrors(errorFolderName + folderSeparator + "errorViewInstanceTranslatedDetails.txt",  APIPageView.obtainErrorDetails())
+      this.writeFileErrors(errorFolderName + folderSeparator + "errorViewTranslatedDetails.txt",  APIPageView.obtainErrorDetails())
       this.writeFileErrors(errorFolderName + folderSeparator + "errorRedirectTranslatedDetails.txt",      APIRedirect.obtainErrorDetails())
 
       APILangLinks.resetErrorList()
@@ -180,7 +181,6 @@ object prepareData extends App {
     //una partizione ogni 2 file di input
     val resultDataFrameSrc = notCompressedDataFrameSrc.coalesce(numPartitionsSrc)
 
-    FileUtils.deleteDirectory(new File(outputFolderName + folderSeparator + "en"))
     resultDataFrameSrc.write.parquet(outputFolderName + folderSeparator + "en")
 
 
@@ -200,7 +200,6 @@ object prepareData extends App {
     //un quarto delle partizioni rispetto alla lingua di partenza
     val resultDataFrameDst = notCompressedDataFrameDst.coalesce(numPartitionsDst)
 
-    FileUtils.deleteDirectory(new File(outputFolderName + folderSeparator + "it"))
     resultDataFrameDst.write.parquet(outputFolderName + folderSeparator + "it")
 
     val endTime = System.currentTimeMillis()
