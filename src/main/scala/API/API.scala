@@ -1,7 +1,6 @@
 
 import java.net.{URLDecoder, URLEncoder}
 import java.nio.charset.StandardCharsets
-
 import scalaj.http.Http
 
 package API {
