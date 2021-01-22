@@ -48,6 +48,10 @@ package API {
           case e:Exception => lista_errori_tmp =  lista_errori_tmp :+  (counter, e.getMessage)
         }
         counter = counter + 1
+
+        if(!cond){
+          Thread.sleep(250)
+        }
       }
       if(!cond){
         this.lista_errori = this.lista_errori :+ (url, lista_errori_tmp)
@@ -107,6 +111,10 @@ package API {
           case e:Exception => lista_errori_tmp = lista_errori_tmp :+  (counter, e.getMessage)
         }
         counter = counter + 1
+
+        if(!cond){
+          Thread.sleep(250)
+        }
       }
       if(!cond){
         this.lista_errori = this.lista_errori :+ (url, lista_errori_tmp)
@@ -162,6 +170,10 @@ package API {
           case e: Exception => lista_errori_tmp = lista_errori_tmp :+  (counter, e.getMessage)
         }
         counter = counter + 1
+
+        if(!cond){
+          Thread.sleep(250)
+        }
       }
       if(!cond){
         this.lista_errori = this.lista_errori :+ (url, lista_errori_tmp)

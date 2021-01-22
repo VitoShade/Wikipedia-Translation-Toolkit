@@ -1,6 +1,7 @@
 import org.apache.spark.sql.SparkSession
 import Utilities._
-import org.apache.spark.sql.functions.{collect_list, desc, sum}
+import org.apache.spark.sql.functions.{asc, col, collect_list, desc, sum, when}
+
 import scala.collection.mutable.{WrappedArray => WA}
 
 object analyseData extends App {
@@ -25,16 +26,23 @@ object analyseData extends App {
     val folderSeparator = "\\"
 
     //cartella parquet inglesi
-    val inputFolders = Array(inputFolderName + folderSeparator + "en")
+    val allInputFoldersSrc = DataFrameUtility.collectParquetFromFoldersRecursively(Array(inputFolderName), "en")
 
-    val allInputFolders = DataFrameUtility.collectParquetFilesFromFolders(inputFolders)
-
-    val dataFrameFilesSrc = allInputFolders map (tempFile => sparkSession.read.parquet(tempFile))
+    val dataFrameFilesSrc = allInputFoldersSrc map (tempFile => sparkSession.read.parquet(tempFile))
 
     //merge dei parquet in un dataFrame unico
     val dataFrameSrc = dataFrameFilesSrc.reduce(_ union _)
 
-    val query = dataFrameSrc.select("id", "num_traduzioni", "id_redirect", "id_pagina_tradotta","num_visualiz_anno", "num_visualiz_mesi", "byte_dim_page")
+    //cartella parquet italiani
+    val allInputFoldersDst = DataFrameUtility.collectParquetFromFoldersRecursively(Array(inputFolderName), "it")
+
+    val dataFrameFilesDst = allInputFoldersDst map (tempFile => sparkSession.read.parquet(tempFile))
+
+    //merge dei parquet in un dataFrame unico
+    val dataFrameDst = dataFrameFilesDst.reduce(_ union _)
+
+
+    val explodedSrc = dataFrameSrc.select("id", "num_traduzioni", "id_redirect", "id_pagina_tradotta","num_visualiz_anno", "num_visualiz_mesi", "byte_dim_page")
                             .map(row => ( row.getAs[String](0),
                                           row.getAs[Int](1),
                                           row.getAs[String](2),
@@ -58,16 +66,11 @@ object analyseData extends App {
                                         )
                             ).toDF("id", "num_traduzioni", "id_redirect", "id_pagina_tradotta", "num_visualiz_anno1", "num_visualiz_anno2", "num_visualiz_anno3", "num_visualiz_mesi1", "num_visualiz_mesi2","num_visualiz_mesi3","num_visualiz_mesi4","num_visualiz_mesi5","num_visualiz_mesi6","num_visualiz_mesi7","num_visualiz_mesi8","num_visualiz_mesi9","num_visualiz_mesi10","num_visualiz_mesi11","num_visualiz_mesi12","byte_dim_page")
 
-    //somma del numero di visualizzazioni per pagine che sono redirect
-    val redirect = query.filter("id_redirect != ''")
-                        .drop("num_traduzioni")
-                        .drop("byte_dim_page")
-                        .groupBy("id_redirect")
-                        .sum()
-                        .withColumnRenamed("id_redirect","id")
+    //val rowProva = Seq(("prova123", 0, "Navapur", "tradotta123", 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0)).toDF("id", "num_traduzioni", "id_redirect", "id_pagina_tradotta", "num_visualiz_anno1", "num_visualiz_anno2", "num_visualiz_anno3", "num_visualiz_mesi1", "num_visualiz_mesi2","num_visualiz_mesi3","num_visualiz_mesi4","num_visualiz_mesi5","num_visualiz_mesi6","num_visualiz_mesi7","num_visualiz_mesi8","num_visualiz_mesi9","num_visualiz_mesi10","num_visualiz_mesi11","num_visualiz_mesi12","byte_dim_page")
 
-    //versione con link pagina italiana
-    /*val redirect = query.filter("id_redirect != ''")
+
+    //somma del numero di visualizzazioni per pagine che sono redirect
+    val redirectSrc = explodedSrc.filter("id_redirect != ''")
       .drop("num_traduzioni")
       .drop("byte_dim_page")
       .groupBy("id_redirect")
@@ -87,28 +90,27 @@ object analyseData extends App {
         sum($"num_visualiz_mesi10"),
         sum($"num_visualiz_mesi11"),
         sum($"num_visualiz_mesi12"),
-        collect_list($"id_pagina_tradotta")
+        collect_list(when(!(col("id_pagina_tradotta") === ""), col("id_pagina_tradotta"))).as("id_traduzioni_redirect")
       ).withColumnRenamed("id_redirect","id")
 
-      probabilmente bisogna fare una passata per comprimere array del tipo [ , , pag1, , pag2] in [pag1, pag2]
-      */
 
     //somma del numero di visualizzazioni delle redirect alle pagine principali
-    val resQuery = query.filter("id_redirect == ''")
-                        .join(redirect, Seq("id"), "left_outer")
+    val compressedSrc = explodedSrc.filter("id_redirect == ''")
+                        .join(redirectSrc, Seq("id"), "left_outer")
                         .na.fill(0)
                         .map(row => ( row.getAs[String](0),
                                       row.getAs[Int](1),
                                       row.getAs[String](3),
                                       (4 to 6) map ( i => row.getAs[Int](i)+row.getAs[Long](i+16)),
                                       (7 to 18) map ( i => row.getAs[Int](i)+row.getAs[Long](i+16)),
-                                      row.getAs[Int](19)
+                                      row.getAs[Int](19),
+                                      row.getAs[WA[String]](35)
                                     )
-                        ).toDF("id", "num_traduzioni", "id_pagina_tradotta", "num_visualiz_anno", "num_visualiz_mesi", "byte_dim_page")
+                        ).toDF("id", "num_traduzioni", "id_pagina_tradotta", "num_visualiz_anno", "num_visualiz_mesi", "byte_dim_page", "id_traduzioni_redirect")
 
-    //resQuery.show(false)
+    //compressedSrc.show(false)
 
-    resQuery.orderBy(desc("byte_dim_page")).show(false)
+    compressedSrc.orderBy(desc("id_traduzioni_redirect")).show(false)
 
     val endTime = System.currentTimeMillis()
 
