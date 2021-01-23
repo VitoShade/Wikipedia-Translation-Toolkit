@@ -21,14 +21,40 @@ object showData extends App {
   override def main(args: Array[String]) {
 
 
-    val sparkSession = SparkSession.builder().master("local[30]").appName("showData").getOrCreate()
+    val sparkSession = SparkSession.builder().master("local[2]").appName("showData").getOrCreate()
     val sparkContext = sparkSession.sparkContext
 
     sparkContext.setLogLevel("WARN")
 
-    val dataFolderName = "/Users/marco/OfflineDocs/Wikipedia_Dump/finiti_copy"
-    val inputFolder = new File(dataFolderName)
-    val folderSeparator = "/"
+    val inputFolderName = "C:\\Users\\nik_9\\Desktop\\prova\\outputProcessati"
+    val inputFolderName2 = "C:\\Users\\nik_9\\Desktop\\prova\\outputProcessati\\File1-3"
+    val folderSeparator = "\\"
+
+    val errorPages = DataFrameUtility.collectErrorPagesFromFoldersRecursively(Array(inputFolderName), sparkSession, false).toDF("id2")
+
+
+    val allInputFoldersSrc = DataFrameUtility.collectParquetFromFoldersRecursively(Array(inputFolderName2), "en")
+
+    val dataFrameFilesSrc = allInputFoldersSrc map (tempFile => sparkSession.read.parquet(tempFile))
+
+    //merge dei parquet in un dataFrame unico
+    val dataFrameSrc = dataFrameFilesSrc.reduce(_ union _)
+
+    val joinedDataFrame = dataFrameSrc.join(errorPages, dataFrameSrc("id") === errorPages("id2"), "inner").
+      select("id", "num_traduzioni", "id_pagina_tradotta","num_visualiz_anno","num_visualiz_mesi","byte_dim_page","id_redirect")
+
+    dataFrameSrc.filter("id == 'Natpisit_Chompoonuch'").show(false)
+
+    val resultDataFrame = dataFrameSrc.except(joinedDataFrame)
+
+    resultDataFrame.filter("id == 'Natpisit_Chompoonuch'").show(false)
+
+
+
+
+    //val temp =
+
+    //res.foreach(println)
 
     /*val tempOutputFolderSrc = Array(inputFolder + folderSeparator + "en" + folderSeparator)
 
@@ -40,7 +66,8 @@ object showData extends App {
 
     dataF.filter("(num_visualiz_anno[0] + num_visualiz_anno[1] + num_visualiz_anno[2]) > 100000").orderBy(desc("num_visualiz_anno")).show(numRows = 1000, truncate = false)*/
 
-    var counter = 0
+
+    /*var counter = 0
 
     (1 to 10000).foreach(_ => {
 
@@ -51,7 +78,7 @@ object showData extends App {
       if(response.is2xx)
         counter += 1
 
-    })
+    })*/
 
 
     sparkSession.stop()
