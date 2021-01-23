@@ -42,16 +42,16 @@ package API {
             }
           }else{
             lista_errori_tmp = lista_errori_tmp :+  (counter, "codice risposta diverso da 2xx")
+
+            if(!cond){
+              Thread.sleep(500)
+            }
           }
         }catch{
           case _:javax.net.ssl.SSLException => lista_errori_tmp = lista_errori_tmp :+  (counter, "BUG delle JDK 11")
           case e:Exception => lista_errori_tmp =  lista_errori_tmp :+  (counter, e.getMessage)
         }
         counter = counter + 1
-
-        if(!cond){
-          Thread.sleep(250)
-        }
       }
       if(!cond){
         this.lista_errori = this.lista_errori :+ (url, lista_errori_tmp)
@@ -105,16 +105,16 @@ package API {
           }
           else{
             lista_errori_tmp = lista_errori_tmp :+  (counter, "codice risposta diverso da 2xx")
+
+            if(!cond){
+              Thread.sleep(500)
+            }
           }
         }catch{
           case _:javax.net.ssl.SSLException => lista_errori_tmp = lista_errori_tmp :+  (counter, "BUG delle JDK 11")
           case e:Exception => lista_errori_tmp = lista_errori_tmp :+  (counter, e.getMessage)
         }
         counter = counter + 1
-
-        if(!cond){
-          Thread.sleep(250)
-        }
       }
       if(!cond){
         this.lista_errori = this.lista_errori :+ (url, lista_errori_tmp)
@@ -164,16 +164,16 @@ package API {
             cond = true
           } else {
             lista_errori_tmp = lista_errori_tmp :+  (counter, "codice risposta diverso da 2xx")
+
+            if(!cond){
+              Thread.sleep(500)
+            }
           }
         } catch {
           case e: javax.net.ssl.SSLException => lista_errori_tmp = lista_errori_tmp :+  (counter, e.getMessage)
           case e: Exception => lista_errori_tmp = lista_errori_tmp :+  (counter, e.getMessage)
         }
         counter = counter + 1
-
-        if(!cond){
-          Thread.sleep(250)
-        }
       }
       if(!cond){
         this.lista_errori = this.lista_errori :+ (url, lista_errori_tmp)
