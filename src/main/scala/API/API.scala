@@ -43,6 +43,10 @@ package API {
             }
           }else{
             lista_errori_tmp = lista_errori_tmp :+  (counter, "codice risposta diverso da 2xx")
+
+            if(!cond){
+              Thread.sleep(500)
+            }
           }
         }catch{
           case _:javax.net.ssl.SSLException => lista_errori_tmp = lista_errori_tmp :+  (counter, "BUG delle JDK 11")
@@ -102,6 +106,10 @@ package API {
           }
           else{
             lista_errori_tmp = lista_errori_tmp :+  (counter, "codice risposta diverso da 2xx")
+
+            if(!cond){
+              Thread.sleep(500)
+            }
           }
         }catch{
           case _:javax.net.ssl.SSLException => lista_errori_tmp = lista_errori_tmp :+  (counter, "BUG delle JDK 11")
@@ -157,6 +165,10 @@ package API {
             cond = true
           } else {
             lista_errori_tmp = lista_errori_tmp :+  (counter, "codice risposta diverso da 2xx")
+
+            if(!cond){
+              Thread.sleep(500)
+            }
           }
         } catch {
           case e: javax.net.ssl.SSLException => lista_errori_tmp = lista_errori_tmp :+  (counter, e.getMessage)

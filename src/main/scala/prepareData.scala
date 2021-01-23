@@ -26,7 +26,7 @@ case class EntryDst(id: String,
 object prepareData extends App {
   override def main(args: Array[String]) {
 
-    val sparkSession = SparkSession.builder().master("local[30]").appName("prepareData").getOrCreate()
+    val sparkSession = SparkSession.builder().master("local[20]").appName("prepareData").getOrCreate()
     val sparkContext = sparkSession.sparkContext
 
     sparkContext.setLogLevel("WARN")
@@ -39,74 +39,70 @@ object prepareData extends App {
     val inputFolderName = "/Users/marco/OfflineDocs/Wikipedia_Dump/toRun"
     val tempFolderName = "/Users/marco/OfflineDocs/Wikipedia_Dump/tmp"
     val outputFolderName = "/Users/marco/OfflineDocs/Wikipedia_Dump/output"
-    val errorFolderName   = "/Users/marco/OfflineDocs/Wikipedia_Dump/error"
+    val errorFolderName   = "/Users/marco/OfflineDocs/Wikipedia_Dump/result/error"
     val folderSeparator = "/"
 
     val inputFolder = new File(inputFolderName)
 
+    //raccolta di tutti i file .txt nella cartella di input
     val inputFiles = inputFolder.listFiles.filter(file => file.isFile && (file.toString.takeRight(4) == ".txt")).map(file => file.toString)
 
     var tempOutputFoldersSrc = Array[String]()
     var tempOutputFoldersDst = Array[String]()
 
     FileUtils.deleteDirectory(new File(tempFolderName))
-    FileUtils.cleanDirectory(new File(errorFolderName))
+    FileUtils.deleteDirectory(new File(outputFolderName))
+    FileUtils.forceMkdir(new File(errorFolderName))
 
-    //inputFiles.foreach(println)
+    //ciclo sui file nella cartella di input
     inputFiles.foreach(inputFileName => {
 
-      val input = sparkContext.textFile(inputFileName, 50)
+      //caricamento del file di input e divisione in task
+      val input = sparkContext.textFile(inputFileName, 60)
 
       var counter = 0
 
+      //chiamata alle API per en.wikipedia e creazione di un record del DataFrame
       val tempResultSrc = input.map(line => {
 
         println(counter)
 
         val tuple1 = APILangLinks.callAPI(line, "en", "it")
-        val num_traduzioni = tuple1._1
-        val id_pagina_tradotta = tuple1._2
-        //println(tuple1)
 
         val tuple2 = APIPageView.callAPI(line, "en")
-        val num_visualiz_anno = tuple2._1
-        val num_visualiz_mesi = tuple2._2
-        //println(line + "   " + tuple2)
-        //println(num_visualiz_anno)
 
         val tuple3 = APIRedirect.callAPI(line, "en")
-        val byte_dim_page = tuple3._1
-        val id_redirect = tuple3._2
-        //println(result3)
 
         counter += 1
 
-        EntrySrc(line, num_traduzioni, id_pagina_tradotta, num_visualiz_anno, num_visualiz_mesi, byte_dim_page, id_redirect)
+        EntrySrc(line, tuple1._1, URLDecoder.decode(tuple1._2,  StandardCharsets.UTF_8), tuple2._1, tuple2._2, tuple3._1, tuple3._2)
 
       }).persist
 
-      //println(result)
-
+      //creazione del DataFrame per en.wikipedia
       val tempDataFrameSrc = tempResultSrc.toDF("id", "num_traduzioni", "id_pagina_tradotta", "num_visualiz_anno", "num_visualiz_mesi", "byte_dim_page", "id_redirect")
 
-      //tempDataFrame.show(false)
-
+      //creazione di una cartella temporanea per il file appena processato
       val tempOutputName = inputFileName.drop(inputFolderName.length + 1).dropRight(4)
 
       val tempOutputFolderSrc = tempFolderName + folderSeparator + "en" + folderSeparator + tempOutputName
 
+      //salvataggio del nome della cartella temporanea
       tempOutputFoldersSrc = tempOutputFoldersSrc :+ tempOutputFolderSrc
 
+      //salvataggio del file temporaneo
       tempDataFrameSrc.write.parquet(tempOutputFolderSrc)
 
+      //salvataggio degli errori per le API di en.wikipedia
       this.writeFileID(errorFolderName + folderSeparator + "errorLangLinks.txt",    APILangLinks.obtainErrorID())
-      this.writeFileID(errorFolderName + folderSeparator + "errorViewInstance.txt", APIPageView.obtainErrorID())
+      this.writeFileID(errorFolderName + folderSeparator + "errorView.txt", APIPageView.obtainErrorID())
       this.writeFileID(errorFolderName + folderSeparator + "errorRedirect.txt",     APIRedirect.obtainErrorID())
 
       this.writeFileErrors(errorFolderName + folderSeparator + "errorLangLinksDetails.txt",     APILangLinks.obtainErrorDetails())
-      this.writeFileErrors(errorFolderName + folderSeparator + "errorViewInstanceDetails.txt",  APIPageView.obtainErrorDetails())
+      this.writeFileErrors(errorFolderName + folderSeparator + "errorViewDetails.txt",  APIPageView.obtainErrorDetails())
       this.writeFileErrors(errorFolderName + folderSeparator + "errorRedirectDetails.txt",      APIRedirect.obtainErrorDetails())
 
+      //reset degli errori
       APILangLinks.resetErrorList()
       APIPageView.resetErrorList()
       APIRedirect.resetErrorList()
@@ -114,65 +110,67 @@ object prepareData extends App {
       //recupero colonna ID pagine tradotte
       val dataFrameTranslatedID = tempDataFrameSrc.filter("id_pagina_tradotta != ''").select("id_pagina_tradotta")
 
-      //dataFrameTranslatedID.show(false)
-
       //recupero ID pagine tradotte
       val translatedID = dataFrameTranslatedID.map(row => row.getString(0))
 
       counter = 0
 
+      //chiamata alle API per it.wikipedia e creazione di un record del DataFrame
       val tempResultDst = translatedID.map(line => {
 
         println(counter)
 
-        val tuple1 = APILangLinks.callAPI(URLDecoder.decode(line,  StandardCharsets.UTF_8), "it", "en")
-        //val num_traduzioni = tuple1._1
-        val id_pagina_originale = tuple1._2
-        //println(tuple1)
+        val tuple1 = APILangLinks.callAPI(line, "it", "en")
 
-        val tuple2 = APIPageView.callAPI(URLDecoder.decode(line,  StandardCharsets.UTF_8), "it")
-        val num_visualiz_anno = tuple2._1
-        val num_visualiz_mesi = tuple2._2
+        val tuple2 = APIPageView.callAPI(line, "it")
 
-        val tuple3 = APIRedirect.callAPI(URLDecoder.decode(line,  StandardCharsets.UTF_8), "it")
-        val byte_dim_page = tuple3._1
-        val id_redirect = tuple3._2
+        val tuple3 = APIRedirect.callAPI(line, "it")
 
         counter += 1
 
-        EntryDst(URLDecoder.decode(line,  StandardCharsets.UTF_8), URLDecoder.decode(id_pagina_originale,  StandardCharsets.UTF_8), num_visualiz_anno, num_visualiz_mesi, byte_dim_page, id_redirect)
+        EntryDst(line, URLDecoder.decode(tuple1._2,  StandardCharsets.UTF_8), tuple2._1, tuple2._2, tuple3._1, tuple3._2)
 
       }).persist
 
+      //creazione del DataFrame per it.wikipedia
       val tempDataFrameDst = tempResultDst.toDF("id", "id_pagina_originale", "num_visualiz_anno", "num_visualiz_mesi", "byte_dim_page", "id_redirect")
 
       val tempOutputFolderDst = tempFolderName + folderSeparator + "it" + folderSeparator + tempOutputName
 
+      //salvataggio del nome della cartella temporanea
       tempOutputFoldersDst = tempOutputFoldersDst :+ tempOutputFolderDst
 
+      //salvataggio del file temporaneo
       tempDataFrameDst.write.parquet(tempOutputFolderDst)
 
+      //salvataggio degli errori per le API di it.wikipedia
       this.writeFileID(errorFolderName + folderSeparator + "errorLangLinksTranslated.txt",    APILangLinks.obtainErrorID())
-      this.writeFileID(errorFolderName + folderSeparator + "errorViewInstanceTranslated.txt", APIPageView.obtainErrorID())
+      this.writeFileID(errorFolderName + folderSeparator + "errorViewTranslated.txt", APIPageView.obtainErrorID())
       this.writeFileID(errorFolderName + folderSeparator + "errorRedirectTranslated.txt",     APIRedirect.obtainErrorID())
 
       this.writeFileErrors(errorFolderName + folderSeparator + "errorLangLinksTranslatedDetails.txt",     APILangLinks.obtainErrorDetails())
-      this.writeFileErrors(errorFolderName + folderSeparator + "errorViewInstanceTranslatedDetails.txt",  APIPageView.obtainErrorDetails())
+      this.writeFileErrors(errorFolderName + folderSeparator + "errorViewTranslatedDetails.txt",  APIPageView.obtainErrorDetails())
       this.writeFileErrors(errorFolderName + folderSeparator + "errorRedirectTranslatedDetails.txt",      APIRedirect.obtainErrorDetails())
 
+      //reset degli errori
       APILangLinks.resetErrorList()
       APIPageView.resetErrorList()
       APIRedirect.resetErrorList()
+
     })
 
+    //recupero del nome dei file parquet temporanei per en.wikipedia
     val allTempFilesSrc = DataFrameUtility.collectParquetFilesFromFolders(tempOutputFoldersSrc)
 
+    //caricamento dei file parquet temporanei
     val dataFrameTempFilesSrc = allTempFilesSrc map (tempFile => sparkSession.read.parquet(tempFile))
 
+    //unione dei DataFrame temporanei in un unico DataFrame
     val notCompressedDataFrameSrc = dataFrameTempFilesSrc.reduce(_ union _)
 
     notCompressedDataFrameSrc.show(false)
 
+    //calcolo del numero di file di output(numero di partizioni)
     var numPartitionsSrc = tempOutputFoldersSrc.length / 2
 
     if(numPartitionsSrc < 1)
@@ -181,10 +179,9 @@ object prepareData extends App {
     //una partizione ogni 2 file di input
     val resultDataFrameSrc = notCompressedDataFrameSrc.coalesce(numPartitionsSrc)
 
-    FileUtils.deleteDirectory(new File(outputFolderName + folderSeparator + "en"))
     resultDataFrameSrc.write.parquet(outputFolderName + folderSeparator + "en")
 
-
+    //recupero del nome dei file parquet temporanei per en.wikipedia
     val allTempFilesDst = DataFrameUtility.collectParquetFilesFromFolders(tempOutputFoldersDst)
 
     val dataFrameTempFilesDst = allTempFilesDst map (tempFile => sparkSession.read.parquet(tempFile))
@@ -201,7 +198,6 @@ object prepareData extends App {
     //un quarto delle partizioni rispetto alla lingua di partenza
     val resultDataFrameDst = notCompressedDataFrameDst.coalesce(numPartitionsDst)
 
-    FileUtils.deleteDirectory(new File(outputFolderName + folderSeparator + "it"))
     resultDataFrameDst.write.parquet(outputFolderName + folderSeparator + "it")
 
     val endTime = System.currentTimeMillis()
@@ -215,7 +211,7 @@ object prepareData extends App {
     sparkSession.stop()
   }
 
-  def writeFileID(filePath:String, listID:Vector[String]): Unit = {
+  def writeFileID(filePath: String, listID: Vector[String]): Unit = {
     val file = new File(filePath)
     if(!file.exists) file.createNewFile()
     val bw = new BufferedWriter(new FileWriter(file, true))
@@ -223,7 +219,7 @@ object prepareData extends App {
     bw.close()
   }
 
-  def writeFileErrors(filePath:String, listErrors:Vector[(String, Vector[(Int, String)])]): Unit = {
+  def writeFileErrors(filePath: String, listErrors: Vector[(String, Vector[(Int, String)])]): Unit = {
     val file = new File(filePath)
     if(!file.exists) file.createNewFile()
     val bw = new BufferedWriter(new FileWriter(file, true))
