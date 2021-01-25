@@ -4,7 +4,7 @@ import java.nio.charset.StandardCharsets
 import API.{APILangLinks, APIPageView, APIRedirect}
 import org.apache.spark.sql.{DataFrame, SparkSession}
 import Utilities._
-import org.apache.spark.sql.functions.{col, collect_set, sum, when}
+import org.apache.spark.sql.functions.{col, collect_set, desc, sum, when}
 
 import scala.collection.mutable.{WrappedArray => WA}
 
@@ -21,9 +21,9 @@ object analyseData extends App {
 
     import sparkSession.implicits._
 
-    val inputFolderName = "/Users/stefano/IdeaProjects/Wikipedia-Translation-Toolkit/src/main/files/result"
+    val inputFolderName = "/Users/stefano/IdeaProjects/Wikipedia-Translation-Toolkit/src/main/files/fileProcessati/File1-10"
     val folderSeparator = "/"
-/*
+
     //cartella parquet inglesi
     val allInputFoldersSrc = DataFrameUtility.collectParquetFromFoldersRecursively(Array(inputFolderName), "en")
 
@@ -98,13 +98,13 @@ object analyseData extends App {
     //compressedSrc.show(false)
 
     compressedSrc.orderBy(desc("id_traduzioni_redirect")).show(false)
-*/
 
     //cartella parquet italiani
     val allInputFoldersDst = DataFrameUtility.collectParquetFromFoldersRecursively(Array(inputFolderName), "it")
     val dataFrameFilesDst = allInputFoldersDst map (tempFile => sparkSession.read.parquet(tempFile))
     //merge dei parquet in un dataFrame unico
-    var dataFrameDst = dataFrameFilesDst.reduce(_ union _)
+    //TODO: da controllare la drop
+    var dataFrameDst = dataFrameFilesDst.reduce(_ union _).dropDuplicates()
 
     dataFrameDst.show(50, false)
 
@@ -170,6 +170,21 @@ object analyseData extends App {
       )
       ).toDF("id", "id_originale", "num_visualiz_anno", "num_visualiz_mesi", "byte_dim_page", "id_originali_redirect")
 
+
+
+
+    //pagine inglesi che hanno avuto errori con le API
+    val errorPagesSrc = DataFrameUtility.collectErrorPagesFromFoldersRecursively(Array(inputFolderName), sparkSession, false).toDF("id2")
+
+    //sottoinsieme delle pagine inglesi compresse che hanno avuto problemi
+    val joinedCompressedSrc = compressedSrc.join(errorPagesSrc, compressedSrc("id") === errorPagesSrc("id2"), "inner").
+      select("id", "num_traduzioni", "id_pagina_tradotta", "num_visualiz_anno", "num_visualiz_mesi", "byte_dim_page", "id_traduzioni_redirect")
+
+    //rimozione dalle pagine compresse di quelle con errori
+    val resultDataFrameSrc = compressedSrc.except(joinedCompressedSrc)
+
+
+
     //redirectDst.show(10,false)
     //compressedDst.show(20, false)
 
@@ -184,7 +199,7 @@ object analyseData extends App {
     sparkSession.stop()
   }
 
-  def missingIDsDF(dataFrameDst:DataFrame, sparkSession: SparkSession) = {
+  def missingIDsDF(dataFrameDst: DataFrame, sparkSession: SparkSession) = {
     import sparkSession.implicits._
     val idDF = dataFrameDst.select("id").rdd.map(_.getAs[String](0)).collect().toList
     dataFrameDst.union(dataFrameDst.filter(!(col("id_redirect") === "") && !(col("id_redirect").isin(idDF: _*))).select("id_redirect").map(line => {
@@ -193,5 +208,31 @@ object analyseData extends App {
       val tuple3 = APIRedirect.callAPI(line.getAs[String](0), "it")
       EntryDst(line.getAs[String](0), URLDecoder.decode(tuple1._2,  StandardCharsets.UTF_8), tuple2._1, tuple2._2, tuple3._1, tuple3._2)
     }).toDF("id", "id_pagina_originale", "num_visualiz_anno", "num_visualiz_mesi", "byte_dim_page", "id_redirect"))
+  }
+
+  def makeNewDF(MainDF: DataFrame, TransDF: DataFrame,sparkSession: SparkSession) = {
+    import sparkSession.implicits._
+    val tmpDF=TransDF.select("id", "id_redirect", "byte_dim_page")
+                   .filter("id_redirect!=''")
+                   .map(row => {(
+                     row.getString(0),
+                     row.getString(1)
+                     )
+                   }).toDF("id", "id_redirect", "byte_dim_page")
+
+    val DF = MainDF.filter("id_pagina_tradotta!=''")
+                    .select("id", "id_pagina_tradotta", "byte_dim_page")
+                    .map(row => {(
+                      row.getString(0),
+                      tmpDF.filter(col("id_pagina_tradotta") === row.getSeq(1)).select("id").rdd.map(_.getString(0)).first,
+                      row.getString(2),
+                      tmpDF.filter(col("id_pagina_tradotta") === row.getSeq(1)).select("byte_dim_page").rdd.map(_.getString(0)).first
+                    )}).toDF("id", "id_traduzione", "byte_dim_page", "byte_dim_page_traduzione")
+
+    DF.show(20, false)
+
+    DF.groupBy("id_pagina_tradotta").sum()
+
+    DF.show(20, false)
   }
 }
