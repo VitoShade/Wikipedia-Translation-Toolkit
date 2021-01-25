@@ -1,6 +1,10 @@
-import org.apache.spark.sql.SparkSession
+import java.net.URLDecoder
+import java.nio.charset.StandardCharsets
+import API.{APILangLinks, APIPageView, APIRedirect}
+import org.apache.spark.sql.{DataFrame, SparkSession}
 import Utilities._
-import org.apache.spark.sql.functions.{col, collect_list, collect_set, desc, sum, when}
+import org.apache.spark.sql.functions.{col, collect_set, desc, sum, when}
+
 import scala.collection.mutable.{WrappedArray => WA}
 
 object analyseData extends App {
@@ -31,15 +35,6 @@ object analyseData extends App {
 
     //merge dei parquet in un dataFrame unico
     val dataFrameSrc = dataFrameFilesSrc.reduce(_ union _)
-
-    //cartella parquet italiani
-    val allInputFoldersDst = DataFrameUtility.collectParquetFromFoldersRecursively(Array(inputFolderName), "it")
-
-    val dataFrameFilesDst = allInputFoldersDst map (tempFile => sparkSession.read.parquet(tempFile))
-
-    //merge dei parquet in un dataFrame unico
-    val dataFrameDst = dataFrameFilesDst.reduce(_ union _)
-
 
     val explodedSrc = dataFrameSrc.select("id", "num_traduzioni", "id_redirect", "id_pagina_tradotta","num_visualiz_anno", "num_visualiz_mesi", "byte_dim_page")
                             .map(row => ( row.getAs[String](0),
@@ -91,7 +86,6 @@ object analyseData extends App {
         collect_set(when(!(col("id_pagina_tradotta") === ""), col("id_pagina_tradotta"))).as("id_traduzioni_redirect")
       ).withColumnRenamed("id_redirect","id")
 
-
     //somma del numero di visualizzazioni delle redirect alle pagine principali
     val compressedSrc = explodedSrc.filter("id_redirect == ''")
                         .join(redirectSrc, Seq("id"), "left_outer")
@@ -109,8 +103,22 @@ object analyseData extends App {
 
     compressedSrc.orderBy(desc("id_traduzioni_redirect")).show(false)
 
-    //dataFrameDst.filter("id_redirect != ''").show(50, false)
 
+    //cartella parquet italiani
+    val allInputFoldersDst = DataFrameUtility.collectParquetFromFoldersRecursively(Array(inputFolderName), "it")
+    val dataFrameFilesDst = allInputFoldersDst map (tempFile => sparkSession.read.parquet(tempFile))
+    //merge dei parquet in un dataFrame unico
+    //TODO: da controllare la drop
+    var dataFrameDst = dataFrameFilesDst.reduce(_ union _).dropDuplicates()
+
+    dataFrameDst.show(50, false)
+
+    //val rowProva = Seq(("Astronavi_e_veicoli_di_Guerre_stellari", "tradotta123", Array(0, 0, 0), Array(0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0), 0, "")).toDF("id", "id_pagina_originale", "num_visualiz_anno", "num_visualiz_mesi", "byte_dim_page", "id_redirect")
+    //dataFrameDst=dataFrameDst.union(rowProva)
+
+    dataFrameDst = missingIDsDF(dataFrameDst, sparkSession)
+
+    dataFrameDst.show(50, false)
 
     val explodedDst = dataFrameDst.select("id", "id_redirect", "id_pagina_originale","num_visualiz_anno", "num_visualiz_mesi", "byte_dim_page")
                                   .map(row => ( row.getAs[String](0),
@@ -167,6 +175,21 @@ object analyseData extends App {
       )
       ).toDF("id", "id_originale", "num_visualiz_anno", "num_visualiz_mesi", "byte_dim_page", "id_originali_redirect")
 
+
+
+
+    //pagine inglesi che hanno avuto errori con le API
+    val errorPagesSrc = DataFrameUtility.collectErrorPagesFromFoldersRecursively(Array(inputFolderName), sparkSession, false).toDF("id2")
+
+    //sottoinsieme delle pagine inglesi compresse che hanno avuto problemi
+    val joinedCompressedSrc = compressedSrc.join(errorPagesSrc, compressedSrc("id") === errorPagesSrc("id2"), "inner").
+      select("id", "num_traduzioni", "id_pagina_tradotta", "num_visualiz_anno", "num_visualiz_mesi", "byte_dim_page", "id_traduzioni_redirect")
+
+    //rimozione dalle pagine compresse di quelle con errori
+    val resultDataFrameSrc = compressedSrc.except(joinedCompressedSrc)
+
+
+
     //redirectDst.show(10,false)
     //compressedDst.show(20, false)
 
@@ -181,4 +204,14 @@ object analyseData extends App {
     sparkSession.stop()
   }
 
+  def missingIDsDF(dataFrameDst:DataFrame, sparkSession: SparkSession) = {
+    import sparkSession.implicits._
+    val idDF = dataFrameDst.select("id").rdd.map(_.getAs[String](0)).collect().toList
+    dataFrameDst.union(dataFrameDst.filter(!(col("id_redirect") === "") && !(col("id_redirect").isin(idDF: _*))).select("id_redirect").map(line => {
+      val tuple1 = APILangLinks.callAPI(line.getAs[String](0), "it", "en")
+      val tuple2 = APIPageView.callAPI(line.getAs[String](0), "it")
+      val tuple3 = APIRedirect.callAPI(line.getAs[String](0), "it")
+      EntryDst(line.getAs[String](0), URLDecoder.decode(tuple1._2,  StandardCharsets.UTF_8), tuple2._1, tuple2._2, tuple3._1, tuple3._2)
+    }).toDF("id", "id_pagina_originale", "num_visualiz_anno", "num_visualiz_mesi", "byte_dim_page", "id_redirect"))
+  }
 }

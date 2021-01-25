@@ -27,58 +27,23 @@ object showData extends App {
     sparkContext.setLogLevel("WARN")
 
     val inputFolderName = "C:\\Users\\nik_9\\Desktop\\prova\\outputProcessati"
-    val inputFolderName2 = "C:\\Users\\nik_9\\Desktop\\prova\\outputProcessati\\File1-3"
     val folderSeparator = "\\"
 
-    val errorPages = DataFrameUtility.collectErrorPagesFromFoldersRecursively(Array(inputFolderName), sparkSession, false).toDF("id2")
+    val res = DataFrameUtility.DEBUG_collectSelectedErrorsFromFoldersRecursively(Array(inputFolderName), sparkSession, false, "errorView")
 
 
-    val allInputFoldersSrc = DataFrameUtility.collectParquetFromFoldersRecursively(Array(inputFolderName2), "en")
+    /*val allInputFoldersSrc = DataFrameUtility.collectParquetFromFoldersRecursively(Array(inputFolderName), "it")
 
     val dataFrameFilesSrc = allInputFoldersSrc map (tempFile => sparkSession.read.parquet(tempFile))
 
     //merge dei parquet in un dataFrame unico
     val dataFrameSrc = dataFrameFilesSrc.reduce(_ union _)
 
-    val joinedDataFrame = dataFrameSrc.join(errorPages, dataFrameSrc("id") === errorPages("id2"), "inner").
-      select("id", "num_traduzioni", "id_pagina_tradotta","num_visualiz_anno","num_visualiz_mesi","byte_dim_page","id_redirect")
 
-    dataFrameSrc.filter("id == 'Natpisit_Chompoonuch'").show(false)
+    println(dataFrameSrc.filter("id_redirect != ''").count())
 
-    val resultDataFrame = dataFrameSrc.except(joinedDataFrame)
+    dataFrameSrc.filter("id_redirect != ''").show(50, false)*/
 
-    resultDataFrame.filter("id == 'Natpisit_Chompoonuch'").show(false)
-
-
-
-
-    //val temp =
-
-    //res.foreach(println)
-
-    /*val tempOutputFolderSrc = Array(inputFolder + folderSeparator + "en" + folderSeparator)
-
-    val allTempFilesSrc = DataFrameUtility.collectParquetFilesFromFolders(tempOutputFolderSrc)
-
-    val dataFrameTempFilesDst = allTempFilesSrc map (tempFile => sparkSession.read.parquet(tempFile))
-
-    val dataF = dataFrameTempFilesDst.reduce(_ union _)
-
-    dataF.filter("(num_visualiz_anno[0] + num_visualiz_anno[1] + num_visualiz_anno[2]) > 100000").orderBy(desc("num_visualiz_anno")).show(numRows = 1000, truncate = false)*/
-
-
-    /*var counter = 0
-
-    (1 to 10000).foreach(_ => {
-
-      println(counter)
-
-      val response = Http("https://en.wikipedia.org/wiki/Natural_exponential_function").asString
-
-      if(response.is2xx)
-        counter += 1
-
-    })*/
 
 
     sparkSession.stop()

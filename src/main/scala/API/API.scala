@@ -62,7 +62,7 @@ package API {
     def parseJSON(response: String, lang: String): (Int, String) = {
       val json = ujson.read(response)
       val dati = json("parse").obj("langlinks").arr
-      (dati.size, dati.map(item => if(item.obj("lang").str == lang ) item.obj("url").str).filter(_ != ()).mkString("").replace("https://" + lang + ".wikipedia.org/wiki/",""))
+      (dati.size, dati.map(item => if(item.obj("lang").str == lang ) item.obj("url").str).filter(_ != ()).mkString("").replace("https://" + lang + ".wikipedia.org/wiki/","").split("#")(0))
 
     }
   }
