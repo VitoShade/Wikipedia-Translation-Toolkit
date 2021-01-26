@@ -97,7 +97,7 @@ object analyseData extends App {
 
     //compressedSrc.show(false)
 
-    compressedSrc.orderBy(desc("id_traduzioni_redirect")).show(false)
+    //compressedSrc.orderBy(desc("id_traduzioni_redirect")).show(false)
 
     //cartella parquet italiani
     val allInputFoldersDst = DataFrameUtility.collectParquetFromFoldersRecursively(Array(inputFolderName), "it")
@@ -106,14 +106,14 @@ object analyseData extends App {
     //TODO: da controllare la drop
     var dataFrameDst = dataFrameFilesDst.reduce(_ union _).dropDuplicates()
 
-    dataFrameDst.show(50, false)
+    //dataFrameDst.show(50, false)
 
     //val rowProva = Seq(("Astronavi_e_veicoli_di_Guerre_stellari", "tradotta123", Array(0, 0, 0), Array(0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0), 0, "")).toDF("id", "id_pagina_originale", "num_visualiz_anno", "num_visualiz_mesi", "byte_dim_page", "id_redirect")
     //dataFrameDst=dataFrameDst.union(rowProva)
 
-    dataFrameDst = missingIDsDF(dataFrameDst, sparkSession)
+    dataFrameDst = missingIDsDF(dataFrameDst, sparkSession).dropDuplicates()
 
-    dataFrameDst.show(50, false)
+    //dataFrameDst.show(50, false)
 
     val explodedDst = dataFrameDst.select("id", "id_redirect", "id_pagina_originale","num_visualiz_anno", "num_visualiz_mesi", "byte_dim_page")
                                   .map(row => ( row.getAs[String](0),
@@ -183,7 +183,7 @@ object analyseData extends App {
     //rimozione dalle pagine compresse di quelle con errori
     val resultDataFrameSrc = compressedSrc.except(joinedCompressedSrc)
 
-
+    val dimPageDF=makeNewDF(resultDataFrameSrc, dataFrameDst)
 
     //redirectDst.show(10,false)
     //compressedDst.show(20, false)
@@ -210,29 +210,32 @@ object analyseData extends App {
     }).toDF("id", "id_pagina_originale", "num_visualiz_anno", "num_visualiz_mesi", "byte_dim_page", "id_redirect"))
   }
 
-  def makeNewDF(MainDF: DataFrame, TransDF: DataFrame,sparkSession: SparkSession) = {
-    import sparkSession.implicits._
-    val tmpDF=TransDF.select("id", "id_redirect", "byte_dim_page")
-                   .filter("id_redirect!=''")
-                   .map(row => {(
-                     row.getString(0),
-                     row.getString(1)
-                     )
-                   }).toDF("id", "id_redirect", "byte_dim_page")
+  def makeNewDF(mainDF: DataFrame, transDF: DataFrame) = {
+    val tmp_DF = transDF.filter("id_redirect!=''")
+                        .select("id", "id_redirect")
+                        .withColumnRenamed("id","id_traduzione")
+                        .withColumnRenamed("id_redirect","id_redirect_traduzione")
 
-    val DF = MainDF.filter("id_pagina_tradotta!=''")
-                    .select("id", "id_pagina_tradotta", "byte_dim_page")
-                    .map(row => {(
-                      row.getString(0),
-                      tmpDF.filter(col("id_pagina_tradotta") === row.getSeq(1)).select("id").rdd.map(_.getString(0)).first,
-                      row.getString(2),
-                      tmpDF.filter(col("id_pagina_tradotta") === row.getSeq(1)).select("byte_dim_page").rdd.map(_.getString(0)).first
-                    )}).toDF("id", "id_traduzione", "byte_dim_page", "byte_dim_page_traduzione")
+    val new_DF = mainDF.select("id", "id_pagina_tradotta", "byte_dim_page")
+                       .join(tmp_DF, mainDF("id_pagina_tradotta")===tmp_DF("id_traduzione"))
+                       .drop("id_pagina_tradotta")
+                       .drop("id_traduzione")
+                       .withColumnRenamed("id_redirect_traduzione","id_pagina_tradotta")
+                       .withColumnRenamed("byte_dim_page","byte_dim_page_tradotta")
 
-    DF.show(20, false)
+    //new_DF.show(50, false)
 
-    DF.groupBy("id_pagina_tradotta").sum()
+    val sum_DF = new_DF.groupBy("id_pagina_tradotta").sum().withColumnRenamed("sum(byte_dim_page)","byte_dim_page_totale")
 
-    DF.show(20, false)
+    //sum_DF.show(50, false)
+
+    val dims_DF = sum_DF.join(transDF.select("id", "byte_dim_page"), sum_DF("id_pagina_tradotta")===transDF("id"))
+      .drop("id")
+      .withColumnRenamed("id_pagina_tradotta", "id_tmp")
+
+    new_DF.join(dims_DF, new_DF("id_pagina_tradotta")===dims_DF("id_tmp")).drop("id_tmp")
   }
+
+
+  //XIV_secolo
 }
