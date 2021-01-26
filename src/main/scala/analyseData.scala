@@ -20,16 +20,15 @@ object analyseData extends App {
 
     val startTime = System.currentTimeMillis()
 
-    val inputFolderName = "C:\\Users\\nik_9\\Desktop\\prova\\outputProcessati\\File1-3"
-    //val inputFolderName = "C:\\Users\\nik_9\\Desktop\\prova\\result"
-
-    /*val tempFolderName = "C:\\Users\\nik_9\\Desktop\\prova\\tempResult"
-    val outputFolderName = "C:\\Users\\nik_9\\Desktop\\prova\\result"
-    val errorFolderName = "C:\\Users\\nik_9\\Desktop\\prova\\result\\error"*/
+    val inputFolderName = "C:\\Users\\nik_9\\Desktop\\prova\\outputProcessati"
+    val outputFolderName = "C:\\Users\\nik_9\\Desktop\\prova\\datiFinali"
+    val errorFolderName = "C:\\Users\\nik_9\\Desktop\\prova\\datiFinali\\error"
     val folderSeparator = "\\"
 
+    DataFrameUtility.retryPagesWithErrorAndReplace(inputFolderName, outputFolderName, errorFolderName, folderSeparator, sparkSession)
+
     //cartella parquet inglesi
-    val allInputFoldersSrc = DataFrameUtility.collectParquetFromFoldersRecursively(Array(inputFolderName), "en")
+    val allInputFoldersSrc = DataFrameUtility.collectParquetFromFoldersRecursively(Array(outputFolderName), "en")
 
     val dataFrameFilesSrc = allInputFoldersSrc map (tempFile => sparkSession.read.parquet(tempFile))
 
@@ -105,7 +104,7 @@ object analyseData extends App {
 
 
     //cartella parquet italiani
-    val allInputFoldersDst = DataFrameUtility.collectParquetFromFoldersRecursively(Array(inputFolderName), "it")
+    val allInputFoldersDst = DataFrameUtility.collectParquetFromFoldersRecursively(Array(outputFolderName), "it")
     val dataFrameFilesDst = allInputFoldersDst map (tempFile => sparkSession.read.parquet(tempFile))
     //merge dei parquet in un dataFrame unico
     //TODO: da controllare la drop
@@ -179,7 +178,7 @@ object analyseData extends App {
 
 
     //pagine inglesi che hanno avuto errori con le API
-    val errorPagesSrc = DataFrameUtility.collectErrorPagesFromFoldersRecursively(Array(inputFolderName), sparkSession, false).toDF("id2")
+    val errorPagesSrc = DataFrameUtility.collectErrorPagesFromFoldersRecursively(Array(outputFolderName), sparkSession, false).toDF("id2")
 
     //sottoinsieme delle pagine inglesi compresse che hanno avuto problemi
     val joinedCompressedSrc = compressedSrc.join(errorPagesSrc, compressedSrc("id") === errorPagesSrc("id2"), "inner").
@@ -187,6 +186,17 @@ object analyseData extends App {
 
     //rimozione dalle pagine compresse di quelle con errori
     val resultDataFrameSrc = compressedSrc.except(joinedCompressedSrc)
+
+
+    //pagine italiane che hanno avuto errori con le API
+    val errorPagesDst = DataFrameUtility.collectErrorPagesFromFoldersRecursively(Array(outputFolderName), sparkSession, true).toDF("id2")
+
+    //sottoinsieme delle pagine italiane compresse che hanno avuto problemi
+    val joinedCompressedDst = compressedDst.join(errorPagesDst, compressedDst("id") === errorPagesDst("id2"), "inner").
+      select("id", "id_originale", "num_visualiz_anno", "num_visualiz_mesi", "byte_dim_page", "id_originali_redirect")
+
+    //rimozione dalle pagine compresse di quelle con errori
+    val resultDataFrameDst = compressedDst.except(joinedCompressedDst)
 
 
 
