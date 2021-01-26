@@ -5,10 +5,11 @@ import API.APIPageView
 import Utilities._
 import org.apache.commons.io.FileUtils
 import java.io._
-import java.net.{URLDecoder, URLEncoder}
+import java.net.URLDecoder
 import java.nio.charset.StandardCharsets
 import org.apache.spark.sql.functions.desc
-import scalaj.http.Http
+
+
 
 
 object showData extends App {

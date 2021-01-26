@@ -3,14 +3,12 @@ import java.io._
 import scala.collection.mutable
 import org.apache.spark.sql._
 import scalaj.http.Http
+import API.{APILangLinks, APIPageView, APIRedirect}
+import org.apache.commons.io.FileUtils
+import java.net.URLDecoder
+import java.nio.charset.StandardCharsets
 
 package Utilities {
-
-  import API.{APILangLinks, APIPageView, APIRedirect}
-  import org.apache.commons.io.FileUtils
-
-  import java.net.URLDecoder
-  import java.nio.charset.StandardCharsets
 
   object DataFrameUtility {
 
@@ -31,7 +29,7 @@ package Utilities {
       allParquetFiles
     }
 
-    def collectParquetFromFoldersRecursively(folders: Array[String], subFolder: String): Array[String] = {
+    def dataFrameFromFoldersRecursively(folders: Array[String], subFolder: String, sparkSession: SparkSession): DataFrame = {
 
       var allParquetFiles = Array[String]()
 
@@ -55,7 +53,12 @@ package Utilities {
         queue ++= recursiveFolders
       }
 
-      allParquetFiles
+      val dataFrameFilesSrc = allParquetFiles map (tempFile => sparkSession.read.parquet(tempFile))
+
+      //merge dei parquet in un dataFrame unico
+      val dataFrameSrc = dataFrameFilesSrc.reduce(_ union _)
+
+      dataFrameSrc
     }
 
     def DEBUG_redirectDiRedirect(dataFrameSrc: DataFrame) {
@@ -157,16 +160,10 @@ package Utilities {
       FileUtils.deleteDirectory(new File(outputFolderName))
       FileUtils.forceMkdir(new File(errorFolderName))
 
-      //cartella parquet inglesi
-      val allInputFoldersSrc = DataFrameUtility.collectParquetFromFoldersRecursively(Array(inputFolderName), "en")
+      //dataFrame dai parquet inglesi
+      val dataFrameSrc = this.dataFrameFromFoldersRecursively(Array(inputFolderName), "en", sparkSession)
 
-      val dataFrameFilesSrc = allInputFoldersSrc map (tempFile => sparkSession.read.parquet(tempFile))
-
-      //merge dei parquet in un dataFrame unico
-      val dataFrameSrc = dataFrameFilesSrc.reduce(_ union _).persist
-
-      val errorPagesSrc = DataFrameUtility.collectErrorPagesFromFoldersRecursively(Array(inputFolderName), sparkSession, false).toDF("id2").persist
-
+      val errorPagesSrc = this.collectErrorPagesFromFoldersRecursively(Array(inputFolderName), sparkSession, false).toDF("id2").persist
 
       var counter = 0
 
@@ -226,15 +223,10 @@ package Utilities {
 
 
 
-      //cartella parquet italiani
-      val allInputFoldersDst = DataFrameUtility.collectParquetFromFoldersRecursively(Array(inputFolderName), "it")
+      //dataFrame dei parquet italiani
+      val dataFrameDst = this.dataFrameFromFoldersRecursively(Array(inputFolderName), "it", sparkSession)
 
-      val dataFrameFilesDst = allInputFoldersDst map (tempFile => sparkSession.read.parquet(tempFile))
-
-      //merge dei parquet in un dataFrame unico
-      val dataFrameDst = dataFrameFilesDst.reduce(_ union _).persist
-
-      val errorPagesDst = DataFrameUtility.collectErrorPagesFromFoldersRecursively(Array(inputFolderName), sparkSession, true).toDF("id2").persist
+      val errorPagesDst = this.collectErrorPagesFromFoldersRecursively(Array(inputFolderName), sparkSession, true).toDF("id2").persist
 
       val dstPagesWithHash = errorPagesDst.filter(x => {x.getString(0).contains("#")})
 
