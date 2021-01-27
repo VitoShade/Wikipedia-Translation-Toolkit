@@ -4,9 +4,7 @@ import API.{APILangLinks, APIPageView, APIRedirect}
 import org.apache.spark.sql.{DataFrame, SparkSession}
 import Utilities._
 import org.apache.spark.sql.functions.{col, collect_set, desc, sum, when}
-
 import scala.collection.mutable.{WrappedArray => WA}
-
 
 object analyseData extends App {
   override def main(args: Array[String]) {
@@ -23,11 +21,16 @@ object analyseData extends App {
 
     val inputFolderName  = "C:\\Users\\nik_9\\Desktop\\prova\\outputProcessati"
     val tempFolderName   = "C:\\Users\\nik_9\\Desktop\\prova\\tempOutput"
-    val errorFolderName  = "C:\\Users\\nik_9\\Desktop\\prova\\tempOutput\\error"
     val outputFolderName = "C:\\Users\\nik_9\\Desktop\\prova\\datiFinali"
+    val errorFolderName  = "C:\\Users\\nik_9\\Desktop\\prova\\datiFinali\\error"
+    val sizeFolderName = "C:\\Users\\nik_9\\Desktop\\prova\\datiFinali\\size"
     val folderSeparator = "\\"
 
     DataFrameUtility.retryPagesWithErrorAndReplace(inputFolderName, tempFolderName, errorFolderName, folderSeparator, sparkSession)
+
+    APILangLinks.resetErrorList()
+    APIPageView.resetErrorList()
+    APIRedirect.resetErrorList()
 
     //dataFrame dai parquet inglesi
     val dataFrameSrc = DataFrameUtility.dataFrameFromFoldersRecursively(Array(tempFolderName), "en", sparkSession)
@@ -107,11 +110,11 @@ object analyseData extends App {
     //val rowProva = Seq(("Astronavi_e_veicoli_di_Guerre_stellari", "tradotta123", Array(0, 0, 0), Array(0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0), 0, "")).toDF("id", "id_pagina_originale", "num_visualiz_anno", "num_visualiz_mesi", "byte_dim_page", "id_redirect")
     //dataFrameDst=dataFrameDst.union(rowProva)
 
-    dataFrameDst = missingIDsDF(dataFrameDst, sparkSession).dropDuplicates()
+    dataFrameDst = missingIDsDF(dataFrameDst, errorFolderName, folderSeparator, sparkSession).dropDuplicates()
 
     //dataFrameDst.show(50, false)
 
-    val explodedDst = dataFrameDst.select("id", "id_redirect", "id_pagina_originale","num_visualiz_anno", "num_visualiz_mesi", "byte_dim_page")
+    /*val explodedDst = dataFrameDst.select("id", "id_redirect", "id_pagina_originale","num_visualiz_anno", "num_visualiz_mesi", "byte_dim_page")
                                   .map(row => ( row.getAs[String](0),
                                                 row.getAs[String](1),
                                                 row.getAs[String](2),
@@ -165,7 +168,7 @@ object analyseData extends App {
                     if(row.getAs[WA[String]](34) != null) row.getAs[WA[String]](34) else WA.empty[String]
       )
       ).toDF("id", "id_originale", "num_visualiz_anno", "num_visualiz_mesi", "byte_dim_page", "id_originali_redirect")
-
+    */
 
 
 
@@ -184,13 +187,17 @@ object analyseData extends App {
     val errorPagesDst = DataFrameUtility.collectErrorPagesFromFoldersRecursively(Array(tempFolderName), sparkSession, true).toDF("id2")
 
     //sottoinsieme delle pagine italiane compresse che hanno avuto problemi
-    val joinedCompressedDst = compressedDst.join(errorPagesDst, compressedDst("id") === errorPagesDst("id2"), "inner").
+    val joinedCompressedDst = dataFrameDst.join(errorPagesDst, dataFrameDst("id") === errorPagesDst("id2"), "inner").
       select("id", "id_originale", "num_visualiz_anno", "num_visualiz_mesi", "byte_dim_page", "id_originali_redirect")
 
     //rimozione dalle pagine compresse di quelle con errori
-    val resultDataFrameDst = compressedDst.except(joinedCompressedDst)
+    val resultDataFrameDst = dataFrameDst.except(joinedCompressedDst)
 
     val dimPageDF = makeNewDF(resultDataFrameSrc, dataFrameDst)
+
+    resultDataFrameSrc.write.parquet(outputFolderName + folderSeparator + "en")
+    resultDataFrameDst.write.parquet(outputFolderName + folderSeparator + "it")
+    dimPageDF.write.parquet(sizeFolderName)
 
     //redirectDst.show(10,false)
     //compressedDst.show(20, false)
@@ -206,15 +213,29 @@ object analyseData extends App {
     sparkSession.stop()
   }
 
-  def missingIDsDF(dataFrameDst: DataFrame, sparkSession: SparkSession) = {
+  def missingIDsDF(dataFrameDst: DataFrame, errorFolderName: String, folderSeparator: String, sparkSession: SparkSession) = {
     import sparkSession.implicits._
+
     val idDF = dataFrameDst.select("id").rdd.map(_.getAs[String](0)).collect().toList
-    dataFrameDst.union(dataFrameDst.filter(!(col("id_redirect") === "") && !(col("id_redirect").isin(idDF: _*))).select("id_redirect").map(line => {
+
+    val dataFrame = dataFrameDst.union(dataFrameDst.filter(!(col("id_redirect") === "") && !(col("id_redirect").isin(idDF: _*))).select("id_redirect").map(line => {
       val tuple1 = APILangLinks.callAPI(line.getAs[String](0), "it", "en")
       val tuple2 = APIPageView.callAPI(line.getAs[String](0), "it")
       val tuple3 = APIRedirect.callAPI(line.getAs[String](0), "it")
-      EntryDst(line.getAs[String](0), URLDecoder.decode(tuple1._2,  StandardCharsets.UTF_8), tuple2._1, tuple2._2, tuple3._1, tuple3._2)
-    }).toDF("id", "id_pagina_originale", "num_visualiz_anno", "num_visualiz_mesi", "byte_dim_page", "id_redirect"))
+
+      (line.getAs[String](0), URLDecoder.decode(tuple1._2,  StandardCharsets.UTF_8), tuple2._1, tuple2._2, tuple3._1, tuple3._2)
+    }).toDF("id", "id_pagina_originale", "num_visualiz_anno", "num_visualiz_mesi", "byte_dim_page", "id_redirect")).persist
+
+    //salvataggio degli errori per le API di it.wikipedia
+    DataFrameUtility.writeFileID(errorFolderName + folderSeparator + "errorLangLinksTranslated.txt", APILangLinks.obtainErrorID())
+    DataFrameUtility.writeFileID(errorFolderName + folderSeparator + "errorViewTranslated.txt",      APIPageView.obtainErrorID())
+    DataFrameUtility.writeFileID(errorFolderName + folderSeparator + "errorRedirectTranslated.txt",  APIRedirect.obtainErrorID())
+
+    DataFrameUtility.writeFileErrors(errorFolderName + folderSeparator + "errorLangLinksTranslatedDetails.txt", APILangLinks.obtainErrorDetails())
+    DataFrameUtility.writeFileErrors(errorFolderName + folderSeparator + "errorViewTranslatedDetails.txt",      APIPageView.obtainErrorDetails())
+    DataFrameUtility.writeFileErrors(errorFolderName + folderSeparator + "errorRedirectTranslatedDetails.txt",  APIRedirect.obtainErrorDetails())
+
+    dataFrame
   }
 
   def makeNewDF(mainDF: DataFrame, transDF: DataFrame) = {

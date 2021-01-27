@@ -13,15 +13,13 @@ object trueAnalyse extends App {
     //per convertire RDD in DataFrame
     import sparkSession.implicits._
 
-    val inputFolderName   = "/Users/stefano/IdeaProjects/Wikipedia-Translation-Toolkit/src/main/files/indici"
-    val tempFolderName    = "/Users/stefano/IdeaProjects/Wikipedia-Translation-Toolkit/src/main/files/tempResult"
-    val outputFolderName  = "/Users/stefano/IdeaProjects/Wikipedia-Translation-Toolkit/src/main/files/result"
-    val errorFolderName   = "/Users/stefano/IdeaProjects/Wikipedia-Translation-Toolkit/src/main/files/result/error"
-    val parquetFolder     = ""
-    val folderSeparator   = "/"
+    val inputFolderName = "C:\\Users\\nik_9\\Desktop\\prova\\datiFinali"
+    val errorFolderName  = "C:\\Users\\nik_9\\Desktop\\prova\\datiFinali\\error"
+    val sizeFolderName = "C:\\Users\\nik_9\\Desktop\\prova\\datiFinali\\size"
+    val folderSeparator   = "\\"
 
     //dataFrame dai parquet inglesi
-    val dataFrameSrc = DataFrameUtility.dataFrameFromFoldersRecursively(Array(parquetFolder), "en", sparkSession)
+    val dataFrameSrc = DataFrameUtility.dataFrameFromFoldersRecursively(Array(inputFolderName), "en", sparkSession)
 
 
     val startTime = System.currentTimeMillis()
