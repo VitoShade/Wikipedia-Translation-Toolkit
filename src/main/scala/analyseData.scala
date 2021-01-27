@@ -3,13 +3,15 @@ import java.nio.charset.StandardCharsets
 import API.{APILangLinks, APIPageView, APIRedirect}
 import org.apache.spark.sql.{DataFrame, SparkSession}
 import Utilities._
+import org.apache.commons.io.FileUtils
 import org.apache.spark.sql.functions.{col, collect_set, desc, sum, when}
+import java.io.File
 import scala.collection.mutable.{WrappedArray => WA}
 
 object analyseData extends App {
   override def main(args: Array[String]) {
 
-    val sparkSession = SparkSession.builder().master("local[16]").appName("analyseData").getOrCreate()
+    val sparkSession = SparkSession.builder().master("local[4]").appName("analyseData").getOrCreate()
     val sparkContext = sparkSession.sparkContext
 
     sparkContext.setLogLevel("WARN")
@@ -19,14 +21,15 @@ object analyseData extends App {
 
     val startTime = System.currentTimeMillis()
 
-    val inputFolderName  = "C:\\Users\\nik_9\\Desktop\\prova\\outputProcessati"
-    val tempFolderName   = "C:\\Users\\nik_9\\Desktop\\prova\\tempOutput"
+    //val inputFolderName  = "C:\\Users\\nik_9\\Desktop\\prova\\outputProcessati"
+    //val tempFolderName   = "C:\\Users\\nik_9\\Desktop\\prova\\tempOutput"
+    val tempFolderName  = "C:\\Users\\nik_9\\Desktop\\prova\\outputProcessati"
     val outputFolderName = "C:\\Users\\nik_9\\Desktop\\prova\\datiFinali"
     val errorFolderName  = "C:\\Users\\nik_9\\Desktop\\prova\\datiFinali\\error"
-    val sizeFolderName = "C:\\Users\\nik_9\\Desktop\\prova\\datiFinali\\size"
+    val sizeFolderName   = "C:\\Users\\nik_9\\Desktop\\prova\\datiFinali\\size"
     val folderSeparator = "\\"
 
-    DataFrameUtility.retryPagesWithErrorAndReplace(inputFolderName, tempFolderName, errorFolderName, folderSeparator, sparkSession)
+    //DataFrameUtility.retryPagesWithErrorAndReplace(inputFolderName, tempFolderName, errorFolderName, folderSeparator, sparkSession)
 
     APILangLinks.resetErrorList()
     APIPageView.resetErrorList()
@@ -110,6 +113,8 @@ object analyseData extends App {
     //val rowProva = Seq(("Astronavi_e_veicoli_di_Guerre_stellari", "tradotta123", Array(0, 0, 0), Array(0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0), 0, "")).toDF("id", "id_pagina_originale", "num_visualiz_anno", "num_visualiz_mesi", "byte_dim_page", "id_redirect")
     //dataFrameDst=dataFrameDst.union(rowProva)
 
+    FileUtils.forceMkdir(new File(errorFolderName))
+
     dataFrameDst = missingIDsDF(dataFrameDst, errorFolderName, folderSeparator, sparkSession).dropDuplicates()
 
     //dataFrameDst.show(50, false)
@@ -170,8 +175,6 @@ object analyseData extends App {
       ).toDF("id", "id_originale", "num_visualiz_anno", "num_visualiz_mesi", "byte_dim_page", "id_originali_redirect")
     */
 
-
-
     //pagine inglesi che hanno avuto errori con le API
     val errorPagesSrc = DataFrameUtility.collectErrorPagesFromFoldersRecursively(Array(tempFolderName), sparkSession, false).toDF("id2")
 
@@ -182,21 +185,28 @@ object analyseData extends App {
     //rimozione dalle pagine compresse di quelle con errori
     val resultDataFrameSrc = compressedSrc.except(joinedCompressedSrc)
 
+    println("checkpoint 1")
 
     //pagine italiane che hanno avuto errori con le API
     val errorPagesDst = DataFrameUtility.collectErrorPagesFromFoldersRecursively(Array(tempFolderName), sparkSession, true).toDF("id2")
 
     //sottoinsieme delle pagine italiane compresse che hanno avuto problemi
     val joinedCompressedDst = dataFrameDst.join(errorPagesDst, dataFrameDst("id") === errorPagesDst("id2"), "inner").
-      select("id", "id_originale", "num_visualiz_anno", "num_visualiz_mesi", "byte_dim_page", "id_originali_redirect")
+      select("id", "id_pagina_originale", "num_visualiz_anno", "num_visualiz_mesi", "byte_dim_page", "id_redirect")
 
     //rimozione dalle pagine compresse di quelle con errori
     val resultDataFrameDst = dataFrameDst.except(joinedCompressedDst)
 
     val dimPageDF = makeNewDF(resultDataFrameSrc, dataFrameDst)
 
-    resultDataFrameSrc.write.parquet(outputFolderName + folderSeparator + "en")
-    resultDataFrameDst.write.parquet(outputFolderName + folderSeparator + "it")
+    //FileUtils.deleteDirectory(new File(outputFolderName))
+    FileUtils.deleteDirectory(new File(sizeFolderName))
+
+    //resultDataFrameSrc.write.parquet(outputFolderName + folderSeparator + "en")
+    //resultDataFrameDst.write.parquet(outputFolderName + folderSeparator + "it")
+
+    println("checkpoint 2")
+
     dimPageDF.write.parquet(sizeFolderName)
 
     //redirectDst.show(10,false)
@@ -224,7 +234,7 @@ object analyseData extends App {
       val tuple3 = APIRedirect.callAPI(line.getAs[String](0), "it")
 
       (line.getAs[String](0), URLDecoder.decode(tuple1._2,  StandardCharsets.UTF_8), tuple2._1, tuple2._2, tuple3._1, tuple3._2)
-    }).toDF("id", "id_pagina_originale", "num_visualiz_anno", "num_visualiz_mesi", "byte_dim_page", "id_redirect")).persist
+    }).toDF("id", "id_pagina_originale", "num_visualiz_anno", "num_visualiz_mesi", "byte_dim_page", "id_redirect"))
 
     //salvataggio degli errori per le API di it.wikipedia
     DataFrameUtility.writeFileID(errorFolderName + folderSeparator + "errorLangLinksTranslated.txt", APILangLinks.obtainErrorID())
@@ -239,10 +249,13 @@ object analyseData extends App {
   }
 
   def makeNewDF(mainDF: DataFrame, transDF: DataFrame) = {
+
     val tmp_DF = transDF.filter("id_redirect!=''")
                         .select("id", "id_redirect")
                         .withColumnRenamed("id","id_traduzione")
                         .withColumnRenamed("id_redirect","id_redirect_traduzione")
+
+    println("tmp_DF " + tmp_DF.count())
 
     val new_DF = mainDF.select("id", "id_pagina_tradotta", "byte_dim_page")
                        .join(tmp_DF, mainDF("id_pagina_tradotta")===tmp_DF("id_traduzione"))
@@ -251,9 +264,13 @@ object analyseData extends App {
                        .withColumnRenamed("id_redirect_traduzione","id_pagina_tradotta")
                        .withColumnRenamed("byte_dim_page","byte_dim_page_tradotta")
 
+    println("new_DF " + new_DF.count())
+
     //new_DF.show(50, false)
 
-    val sum_DF = new_DF.groupBy("id_pagina_tradotta").sum().withColumnRenamed("sum(byte_dim_page)","byte_dim_page_totale")
+    val sum_DF = new_DF.groupBy("id_pagina_tradotta").sum().withColumnRenamed("sum(byte_dim_page_tradotta)","byte_dim_page_totale")
+
+    println("sum_DF " + sum_DF.count())
 
     //sum_DF.show(50, false)
 
@@ -261,9 +278,8 @@ object analyseData extends App {
       .drop("id")
       .withColumnRenamed("id_pagina_tradotta", "id_tmp")
 
+    println("dims_DF " + dims_DF.count())
+
     new_DF.join(dims_DF, new_DF("id_pagina_tradotta")===dims_DF("id_tmp")).drop("id_tmp")
   }
-
-
-  //XIV_secolo
 }

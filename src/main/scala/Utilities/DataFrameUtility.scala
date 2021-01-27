@@ -222,7 +222,6 @@ package Utilities {
 
 
 
-
       //dataFrame dei parquet italiani
       val dataFrameDst = this.dataFrameFromFoldersRecursively(Array(inputFolderName), "it", sparkSession)
 
@@ -281,6 +280,81 @@ package Utilities {
       this.writeFileErrors(errorFolderName + folderSeparator + "errorLangLinksTranslatedDetails.txt", APILangLinks.obtainErrorDetails())
       this.writeFileErrors(errorFolderName + folderSeparator + "errorViewTranslatedDetails.txt",      APIPageView.obtainErrorDetails())
       this.writeFileErrors(errorFolderName + folderSeparator + "errorRedirectTranslatedDetails.txt",  APIRedirect.obtainErrorDetails())
+
+    }
+
+    def DEBUG_newDataFrame(inputFolderName: Array[String], sparkSession: SparkSession) = {
+      //per convertire RDD in DataFrame
+
+      var allParquetFiles = Array[String]()
+
+      var queue = new mutable.Queue[String]()
+
+      queue ++= inputFolderName
+
+      while(queue.nonEmpty) {
+
+        val folder = new File(queue.dequeue())
+
+        //println(folder.toString)
+
+        val temp = folder.listFiles.filter(file => file.isDirectory).map(file => file.toString.takeRight(2))
+
+        if(temp.contains("it") && temp.contains("en"))
+          this.DEBUG_joinDataFrame(folder.toString, sparkSession)
+
+        val recursiveFolders = folder.listFiles.filter(file => file.isDirectory).map(file => file.toString)
+
+        queue ++= recursiveFolders
+
+      }
+
+      /*while(queue.nonEmpty) {
+
+        val folder = new File(queue.dequeue())
+
+        if(folder.toString.takeRight(2) == subFolder) {
+
+          val files = folder.listFiles.filter(file => file.isFile && (file.toString.takeRight(15) == ".snappy.parquet")).map(file => file.toString)
+
+          allParquetFiles = allParquetFiles ++ files
+        }
+
+        val recursiveFolders = folder.listFiles.filter(file => file.isDirectory).map(file => file.toString)
+
+        queue ++= recursiveFolders
+      }
+
+      val dataFrameFilesSrc = allParquetFiles map (tempFile => sparkSession.read.parquet(tempFile))
+
+      //merge dei parquet in un dataFrame unico
+      val dataFrameSrc = dataFrameFilesSrc.reduce(_ union _)
+
+      dataFrameSrc*/
+    }
+
+    def DEBUG_joinDataFrame(folder: String, sparkSession: SparkSession) = {
+
+      import sparkSession.implicits._
+
+      val dataFrameSrc = this.dataFrameFromFoldersRecursively(Array(folder), "en", sparkSession)
+      val dataFrameDst = this.dataFrameFromFoldersRecursively(Array(folder), "it", sparkSession)
+
+      var mappa = Map[String, String]().withDefaultValue("")
+
+      dataFrameDst.foreach(row => {
+
+        mappa += (row.getString(0) -> row.getString(5))
+      })
+
+      val res = dataFrameSrc.map(row => {
+
+        //val idIta = dataFrameDst.filter("id == '" + row.getString(2) +"'").first().getString(0)
+
+        (row.getString(0), row.getInt(1), row.getString(2), row.getAs[mutable.WrappedArray[Int]](3), row.getAs[mutable.WrappedArray[Int]](4), row.getInt(5), row.getString(6), mappa(row.getString(2)))
+      }).toDF("id", "num_traduzioni", "id_pagina_tradotta", "num_visualiz_anno", "num_visualiz_mesi", "byte_dim_page", "id_redirect", "id_ita")
+
+      res.filter("id_ita != ''").show(10, false)
 
     }
 
