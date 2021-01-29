@@ -205,7 +205,6 @@ object analyseData extends App {
     //dimPageDF.filter("byte_dim_page!=byte_dim_page_tot").show(10, false)
     //dimPageDF.filter(size($"id_redirect")>0).show(10,false)
     val removeEmpty = udf((array: Seq[String]) => !array.isEmpty)
-    resultDataFrameSrc.filter(removeEmpty($"id_traduzioni_redirect")).show(10, false)
     dimPageDF.filter(removeEmpty($"id_redirect")).show(10, false)
 
 
