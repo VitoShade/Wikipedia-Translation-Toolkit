@@ -6,22 +6,6 @@ import java.io._
 import java.net.URLDecoder
 import java.nio.charset.StandardCharsets
 
-//case class perché sono immutabili
-case class EntrySrc(id: String,
-                 numTraduzioni: Int,
-                 IDPaginaTradotta: String,
-                 numVisualizzazioniAnno: Array[Int],
-                 numVisualizzazioniMesi: Array[Int],
-                 numByte: Int,
-                 IDPaginaPrincipale: String)
-
-case class EntryDst(id: String,
-                    IDPaginaOriginale: String,
-                    numVisualizzazioniAnno: Array[Int],
-                    numVisualizzazioniMesi: Array[Int],
-                    numByte: Int,
-                    IDPaginaPrincipale: String)
-
 object prepareData extends App {
   override def main(args: Array[String]) {
 
@@ -74,7 +58,7 @@ object prepareData extends App {
 
         counter += 1
 
-        EntrySrc(line, tuple1._1, URLDecoder.decode(tuple1._2,  StandardCharsets.UTF_8), tuple2._1, tuple2._2, tuple3._1, tuple3._2)
+        (line, tuple1._1, URLDecoder.decode(tuple1._2,  StandardCharsets.UTF_8), tuple2._1, tuple2._2, tuple3._1, tuple3._2)
 
       }).persist
 
@@ -127,7 +111,7 @@ object prepareData extends App {
 
         counter += 1
 
-        EntryDst(line, URLDecoder.decode(tuple1._2,  StandardCharsets.UTF_8), tuple2._1, tuple2._2, tuple3._1, tuple3._2)
+        (line, URLDecoder.decode(tuple1._2,  StandardCharsets.UTF_8), tuple2._1, tuple2._2, tuple3._1, tuple3._2)
 
       }).persist
 

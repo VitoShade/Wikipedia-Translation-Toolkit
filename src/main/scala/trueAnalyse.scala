@@ -1,11 +1,11 @@
 import Utilities._
 import org.apache.spark.sql.SparkSession
 
-object analyseData extends App {
+object trueAnalyse extends App {
 
   override def main(args: Array[String]) {
 
-    val sparkSession = SparkSession.builder().master("local[32]").appName("prepareData").getOrCreate()
+    val sparkSession = SparkSession.builder().master("local[32]").appName("trueAnalyse").getOrCreate()
     val sparkContext = sparkSession.sparkContext
 
     sparkContext.setLogLevel("WARN")
@@ -13,20 +13,14 @@ object analyseData extends App {
     //per convertire RDD in DataFrame
     import sparkSession.implicits._
 
-    val inputFolderName   = "/Users/stefano/IdeaProjects/Wikipedia-Translation-Toolkit/src/main/files/indici"
-    val tempFolderName    = "/Users/stefano/IdeaProjects/Wikipedia-Translation-Toolkit/src/main/files/tempResult"
-    val outputFolderName  = "/Users/stefano/IdeaProjects/Wikipedia-Translation-Toolkit/src/main/files/result"
-    val errorFolderName   = "/Users/stefano/IdeaProjects/Wikipedia-Translation-Toolkit/src/main/files/result/error"
-    val parquetFolder     = ""
+    val inputFolderName = "/Users/stefano/IdeaProjects/Wikipedia-Translation-Toolkit/src/main/files/datiFinali"
+    val errorFolderName  = "/Users/stefano/IdeaProjects/Wikipedia-Translation-Toolkit/src/main/files/datiFinali/error"
+    val sizeFolderName = "/Users/stefano/IdeaProjects/Wikipedia-Translation-Toolkit/src/main/files/datiFinali/size"
     val folderSeparator   = "/"
 
-    //cartella parquet inglesi
-    val allInputFoldersSrc = DataFrameUtility.collectParquetFromFoldersRecursively(Array(parquetFolder), "en")
+    //dataFrame dai parquet inglesi
+    val dataFrameSrc = DataFrameUtility.dataFrameFromFoldersRecursively(Array(inputFolderName), "en", sparkSession)
 
-    val dataFrameFilesSrc = allInputFoldersSrc map (tempFile => sparkSession.read.parquet(tempFile))
-
-    //merge dei parquet in un dataFrame unico
-    val dataFrameSrc = dataFrameFilesSrc.reduce(_ union _)
 
     val startTime = System.currentTimeMillis()
 
