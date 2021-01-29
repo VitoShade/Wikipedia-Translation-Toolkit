@@ -1,12 +1,16 @@
+import java.io.File
 import java.net.URLDecoder
 import java.nio.charset.StandardCharsets
+
 import API.{APILangLinks, APIPageView, APIRedirect}
 import org.apache.spark.sql.{DataFrame, SparkSession}
 import Utilities._
 import org.apache.commons.io.FileUtils
-import org.apache.spark.sql.functions.{col, collect_set, desc, sum, when}
-import java.io.File
+import org.apache.spark.sql.functions.{col, collect_set, desc, sum, udf, when}
+
+import scala.collection.mutable
 import scala.collection.mutable.{WrappedArray => WA}
+
 
 object analyseData extends App {
   override def main(args: Array[String]) {
@@ -16,17 +20,18 @@ object analyseData extends App {
 
     sparkContext.setLogLevel("WARN")
 
-    //per convertire RDD in DataFrame
+    val startTime = System.currentTimeMillis()
+
     import sparkSession.implicits._
 
-    val startTime = System.currentTimeMillis()
-    //val inputFolderName =  "/Users/marco/OfflineDocs/Wikipedia_Dump/finiti_copy"
-    //val outputFolderName = "/Users/marco/OfflineDocs/Wikipedia_Dump/tab_res"
-    val tempFolderName  = "/Users/marco/OfflineDocs/Wikipedia_Dump/finiti_copy"
-    val outputFolderName = "C:\\Users\\nik_9\\Desktop\\prova\\datiFinali"
-    val errorFolderName  = "C:\\Users\\nik_9\\Desktop\\prova\\datiFinali\\error"
-    val sizeFolderName   = "C:\\Users\\nik_9\\Desktop\\prova\\datiFinali\\size"
-    val folderSeparator = "/"
+    val inputFolderName   = "/Users/stefano/IdeaProjects/Wikipedia-Translation-Toolkit/src/main/files/outputProcessati"
+    //val tempFolderName    = "/Users/stefano/IdeaProjects/Wikipedia-Translation-Toolkit/src/main/files/tempOutput"
+    val tempFolderName    = "/Users/stefano/IdeaProjects/Wikipedia-Translation-Toolkit/src/main/files/outputProcessati"
+
+    val outputFolderName = "/Users/stefano/IdeaProjects/Wikipedia-Translation-Toolkit/src/main/files/datiFinali"
+    val errorFolderName   = "/Users/stefano/IdeaProjects/Wikipedia-Translation-Toolkit/src/main/files/datiFinali/error"
+    val sizeFolderName = "/Users/stefano/IdeaProjects/Wikipedia-Translation-Toolkit/src/main/files/datiFinali/size"
+    val folderSeparator   = "/"
 
     //DataFrameUtility.retryPagesWithErrorAndReplace(inputFolderName, tempFolderName, errorFolderName, folderSeparator, sparkSession)
 
@@ -112,8 +117,6 @@ object analyseData extends App {
     //val rowProva = Seq(("Astronavi_e_veicoli_di_Guerre_stellari", "tradotta123", Array(0, 0, 0), Array(0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0), 0, "")).toDF("id", "id_pagina_originale", "num_visualiz_anno", "num_visualiz_mesi", "byte_dim_page", "id_redirect")
     //dataFrameDst=dataFrameDst.union(rowProva)
 
-    FileUtils.forceMkdir(new File(errorFolderName))
-
     dataFrameDst = missingIDsDF(dataFrameDst, errorFolderName, folderSeparator, sparkSession).dropDuplicates()
 
     //dataFrameDst.show(50, false)
@@ -174,6 +177,8 @@ object analyseData extends App {
       ).toDF("id", "id_originale", "num_visualiz_anno", "num_visualiz_mesi", "byte_dim_page", "id_originali_redirect")
     */
 
+
+
     //pagine inglesi che hanno avuto errori con le API
     val errorPagesSrc = DataFrameUtility.collectErrorPagesFromFoldersRecursively(Array(tempFolderName), sparkSession, false).toDF("id2")
 
@@ -184,7 +189,6 @@ object analyseData extends App {
     //rimozione dalle pagine compresse di quelle con errori
     val resultDataFrameSrc = compressedSrc.except(joinedCompressedSrc)
 
-    println("checkpoint 1")
 
     //pagine italiane che hanno avuto errori con le API
     val errorPagesDst = DataFrameUtility.collectErrorPagesFromFoldersRecursively(Array(tempFolderName), sparkSession, true).toDF("id2")
@@ -195,21 +199,22 @@ object analyseData extends App {
 
     //rimozione dalle pagine compresse di quelle con errori
     val resultDataFrameDst = dataFrameDst.except(joinedCompressedDst)
+    //val dimPageDF = makeNewDF(resultDataFrameSrc, dataFrameDst)
 
-    val dimPageDF = makeNewDF(resultDataFrameSrc, dataFrameDst)
+    val dimPageDF = addSumDim(resultDataFrameSrc, dataFrameDst, sparkSession)
+    //dimPageDF.filter("byte_dim_page!=byte_dim_page_tot").show(10, false)
+    //dimPageDF.filter(size($"id_redirect")>0).show(10,false)
+    val removeEmpty = udf((array: Seq[String]) => !array.isEmpty)
+    dimPageDF.filter(removeEmpty($"id_redirect")).show(10, false)
 
-    //FileUtils.deleteDirectory(new File(outputFolderName))
-    FileUtils.deleteDirectory(new File(sizeFolderName))
 
+
+    FileUtils.deleteDirectory(new File(outputFolderName))
+    FileUtils.forceMkdir(new File(errorFolderName))
     //resultDataFrameSrc.write.parquet(outputFolderName + folderSeparator + "en")
     //resultDataFrameDst.write.parquet(outputFolderName + folderSeparator + "it")
+    //dimPageDF.write.parquet(sizeFolderName)
 
-    println("checkpoint 2")
-
-    dimPageDF.write.parquet(sizeFolderName)
-
-    //redirectDst.show(10,false)
-    //compressedDst.show(20, false)
 
     val endTime = System.currentTimeMillis()
 
@@ -233,7 +238,7 @@ object analyseData extends App {
       val tuple3 = APIRedirect.callAPI(line.getAs[String](0), "it")
 
       (line.getAs[String](0), URLDecoder.decode(tuple1._2,  StandardCharsets.UTF_8), tuple2._1, tuple2._2, tuple3._1, tuple3._2)
-    }).toDF("id", "id_pagina_originale", "num_visualiz_anno", "num_visualiz_mesi", "byte_dim_page", "id_redirect"))
+    }).toDF("id", "id_pagina_originale", "num_visualiz_anno", "num_visualiz_mesi", "byte_dim_page", "id_redirect")).persist
 
     //salvataggio degli errori per le API di it.wikipedia
     DataFrameUtility.writeFileID(errorFolderName + folderSeparator + "errorLangLinksTranslated.txt", APILangLinks.obtainErrorID())
@@ -254,8 +259,6 @@ object analyseData extends App {
                         .withColumnRenamed("id","id_traduzione")
                         .withColumnRenamed("id_redirect","id_redirect_traduzione")
 
-    println("tmp_DF " + tmp_DF.count())
-
     val new_DF = mainDF.select("id", "id_pagina_tradotta", "byte_dim_page")
                        .join(tmp_DF, mainDF("id_pagina_tradotta")===tmp_DF("id_traduzione"))
                        .drop("id_pagina_tradotta")
@@ -263,22 +266,40 @@ object analyseData extends App {
                        .withColumnRenamed("id_redirect_traduzione","id_pagina_tradotta")
                        .withColumnRenamed("byte_dim_page","byte_dim_page_tradotta")
 
-    println("new_DF " + new_DF.count())
-
-    //new_DF.show(50, false)
-
     val sum_DF = new_DF.groupBy("id_pagina_tradotta").sum().withColumnRenamed("sum(byte_dim_page_tradotta)","byte_dim_page_totale")
-
-    println("sum_DF " + sum_DF.count())
-
-    //sum_DF.show(50, false)
 
     val dims_DF = sum_DF.join(transDF.select("id", "byte_dim_page"), sum_DF("id_pagina_tradotta")===transDF("id"))
       .drop("id")
       .withColumnRenamed("id_pagina_tradotta", "id_tmp")
 
-    println("dims_DF " + dims_DF.count())
-
     new_DF.join(dims_DF, new_DF("id_pagina_tradotta")===dims_DF("id_tmp")).drop("id_tmp")
+
+  }
+
+  def addSumDim(mainDF: DataFrame, transDF: DataFrame, sparkSession: SparkSession) = {
+    import sparkSession.implicits._
+
+    val mappa = transDF.map(row =>
+      (row.getString(0), row.getString(5))
+    ).collect().toMap.withDefaultValue("")
+
+    val mappa2 = transDF.map(row => (row.getString(5), row.getInt(4))).collect().toMap.withDefaultValue(0)
+
+    val res = mainDF.map(row => {
+      (row.getString(0), row.getInt(1), row.getString(2), row.getAs[mutable.WrappedArray[Int]](3), row.getAs[mutable.WrappedArray[Int]](4), row.getInt(5), row.getAs[mutable.WrappedArray[String]](6), mappa(row.getString(2)), mappa2(mappa(row.getString(2))))
+    }).toDF("id", "num_traduzioni", "id_pagina_tradotta", "num_visualiz_anno", "num_visualiz_mesi", "byte_dim_page", "id_redirect", "id_ita", "byte_dim_page_ita_original")
+
+    val sumDF = res.groupBy("id_ita")
+                    .sum("byte_dim_page")
+                    .withColumnRenamed("sum(byte_dim_page)","byte_dim_page_tot")
+                    .withColumnRenamed("id_ita", "id_ita2")
+
+    val dimsDF = res.join(sumDF, res("id_ita")=== sumDF("id_ita2"))
+                    .drop("num_traduzioni")
+                    .drop("num_visualiz_anno")
+                    .drop("num_visualiz_mesi")
+                    .drop("id_ita2")
+
+    dimsDF
   }
 }

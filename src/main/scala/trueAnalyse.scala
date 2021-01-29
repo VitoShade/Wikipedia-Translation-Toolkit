@@ -5,6 +5,7 @@ import org.apache.spark.sql.types.IntegerType
 
 import scala.collection.mutable.{WrappedArray => WA}
 import org.apache.spark.sql.functions.udf
+import scala.math._
 
 object trueAnalyse extends App {
 
@@ -26,8 +27,13 @@ object trueAnalyse extends App {
     //dataFrame dai parquet inglesi
     val dataFrameSrc = DataFrameUtility.dataFrameFromFoldersRecursively(Array(inputFolderName), "en", sparkSession)
 
-
     val startTime = System.currentTimeMillis()
+
+
+    //"id", "num_traduzioni", "id_pagina_tradotta", "num_visualiz_anno", "num_visualiz_mesi", "byte_dim_page", "id_traduzioni_redirect"
+
+
+
 
     val sum_ = udf((xs: WA[Int]) => xs.sum)
 
@@ -46,8 +52,13 @@ object trueAnalyse extends App {
     var scoreDF = minMax.withColumn("score",score_($"sum")).sort(desc("score"))
 
     // bonus pagina senza traduzione
-    val translateBonus_ = udf((score: Double, transl: String) =>
-        if (transl == "" ) score+20 else score
+    val translateBonus_ = udf((score: Double, byteIt: Int, byteEn: Int) =>
+      // se somma traduzioni inglese = null
+      //      byteEn = byte_dim_page
+      // else
+      //      byteEn = sum_byte_en
+      // byteIt = byte_pagina_tradotta + sum(byte traduzioni redirect)
+        score + 20.0 * ((byteEn - byteIt).toDouble/ math.max(byteEn, byteIt))
     )
 
     scoreDF = scoreDF.withColumn("score",translateBonus_($"score", $"id_pagina_tradotta")).sort(desc("score"))
