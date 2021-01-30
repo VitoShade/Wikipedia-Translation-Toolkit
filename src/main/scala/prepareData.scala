@@ -20,20 +20,21 @@ object prepareData extends App {
 
     sparkContext.setLogLevel("WARN")
 
+    //per convertire RDD in DataFrame
     import sparkSession.implicits._
-
-    val inputFolderName = "/Users/stefano/IdeaProjects/Wikipedia-Translation-Toolkit/src/main/files/outputProcessati"
-    //val tempFolderName    = "/Users/stefano/IdeaProjects/Wikipedia-Translation-Toolkit/src/main/files/tempOutput"
-    val tempFolderName = "/Users/stefano/IdeaProjects/Wikipedia-Translation-Toolkit/src/main/files/outputProcessati"
-
-    val outputFolderName = "/Users/stefano/IdeaProjects/Wikipedia-Translation-Toolkit/src/main/files/datiFinali"
-    val errorFolderName = "/Users/stefano/IdeaProjects/Wikipedia-Translation-Toolkit/src/main/files/datiFinali/error"
-    val sizeFolderName = "/Users/stefano/IdeaProjects/Wikipedia-Translation-Toolkit/src/main/files/datiFinali/size"
-    val folderSeparator = "/"
 
     val startTime = System.currentTimeMillis()
 
+    val inputFolderName  = "/Users/marco/IdeaProjects/Wikipedia-Translation-Toolkit/file/outputProcessati"
+    val tempFolderName   = "/Users/marco/IdeaProjects/Wikipedia-Translation-Toolkit/file/tmpOutput"
+    val outputFolderName = "/Users/marco/IdeaProjects/Wikipedia-Translation-Toolkit/file/datiFinali"
+    val errorFolderName  = "/Users/marco/IdeaProjects/Wikipedia-Translation-Toolkit/file/tmpOutput/error"
+    val sizeFolderName   = "/Users/marco/IdeaProjects/Wikipedia-Translation-Toolkit/file/datiFinali/size"
+    val folderSeparator = "/"
+
     // Retry errori durante downloadData e pulizia link a pagine italiane
+    FileUtils.deleteDirectory(new File(errorFolderName))
+    FileUtils.forceMkdir(new File(errorFolderName))
     DataFrameUtility.retryPagesWithErrorAndReplace(inputFolderName, tempFolderName, errorFolderName, folderSeparator, sparkSession)
 
     APILangLinks.resetErrorList()
@@ -54,14 +55,15 @@ object prepareData extends App {
     dataFrameDst = missingIDsDF(dataFrameDst, errorFolderName, folderSeparator, sparkSession).dropDuplicates()
 
     // Cancellazione pagine con errori
-    val (resultDataFrameSrc, resultDataFrameDst) = removeErrorPages(compressedSrc, dataFrameDst, sparkSession, tempFolderName, errorFolderName)
+    val (resultDataFrameSrc, resultDataFrameDst) = removeErrorPages(compressedSrc, dataFrameDst, sparkSession, tempFolderName)
 
+    println("start makeDimDF")
     // Creazione DataFrame dimensioni
-    val dimPageDF = makeDimDF(resultDataFrameSrc, dataFrameDst, sparkSession)
+    val dimPageDF = makeDimDF(resultDataFrameSrc, resultDataFrameDst, sparkSession)
 
     // Pulizia directory
-    FileUtils.deleteDirectory(new File(outputFolderName))
-    FileUtils.forceMkdir(new File(errorFolderName))
+    FileUtils.deleteDirectory(new File(outputFolderName + folderSeparator + "en"))
+    FileUtils.deleteDirectory(new File(outputFolderName + folderSeparator + "it"))
     //resultDataFrameSrc.write.parquet(outputFolderName + folderSeparator + "en")
     //resultDataFrameDst.write.parquet(outputFolderName + folderSeparator + "it")
     //dimPageDF.write.parquet(sizeFolderName)
@@ -176,7 +178,7 @@ object prepareData extends App {
     dataFrame
   }
 
-  def removeErrorPages(compressedSrc: DataFrame, dataFrameDst:DataFrame, sparkSession: SparkSession, tempFolderName: String, errorFolderName: String ) = {
+  def removeErrorPages(compressedSrc: DataFrame, dataFrameDst:DataFrame, sparkSession: SparkSession, tempFolderName: String) = {
 
     //pagine inglesi che hanno avuto errori con le API
     val errorPagesSrc = DataFrameUtility.collectErrorPagesFromFoldersRecursively(Array(tempFolderName), sparkSession, false).toDF("id2")

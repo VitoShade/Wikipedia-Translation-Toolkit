@@ -63,13 +63,6 @@ object analyseData extends App {
 
     scoreDF = scoreDF.withColumn("score",translateBonus_($"score", $"id_pagina_tradotta")).sort(desc("score"))
 
-
-
-
-
-
-
-
     val endTime = System.currentTimeMillis()
 
     val minutes = (endTime - startTime) / 60000
