@@ -4,12 +4,6 @@ import API.APIRedirect
 import API.APIPageView
 import Utilities._
 import org.apache.commons.io.FileUtils
-import java.io._
-import java.net.URLDecoder
-import java.nio.charset.StandardCharsets
-import org.apache.spark.sql.functions.desc
-
-
 
 
 object showData extends App {
@@ -26,9 +20,16 @@ object showData extends App {
     val errorFolderName = "C:\\Users\\nik_9\\Desktop\\prova\\datiFinali\\error"
     val folderSeparator = "\\"
 
-    DataFrameUtility.DEBUG_newDataFrame(Array(inputFolderName), sparkSession)
+    val startTime = System.currentTimeMillis()
 
+    //DataFrameUtility.DEBUG_newDataFrame(Array(inputFolderName), sparkSession)
 
+    val endTime = System.currentTimeMillis()
+
+    val minutes = (endTime - startTime) / 60000
+    val seconds = ((endTime - startTime) / 1000) % 60
+
+    println("Time: " + minutes + " minutes " + seconds + " seconds")
 
     sparkSession.stop()
   }

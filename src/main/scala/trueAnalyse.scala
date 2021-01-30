@@ -1,5 +1,8 @@
 import Utilities._
 import org.apache.spark.sql.SparkSession
+import org.apache.spark.sql.functions.{col, desc, lit}
+import scala.collection.mutable.{WrappedArray => WA}
+import org.apache.spark.sql.functions.udf
 
 object trueAnalyse extends App {
 
@@ -23,6 +26,29 @@ object trueAnalyse extends App {
 
 
     val startTime = System.currentTimeMillis()
+
+    val sum_ = udf((xs: WA[Int]) => xs.sum)
+
+
+    //def geoEncode(level: Int) = udf( (lat: Double, long: Double) => GeoHex.encode(lat, long, level)) df.withColumn("code", geoEncode(9)($"resolved_lat", $"resolved_lon")).show
+
+    // Somma visualizzazioni anno
+    val minMax = dataFrameSrc.withColumn("sum", sum_($"num_visualiz_anno")).sort(desc("sum"))
+
+
+    val max = minMax.first().getAs[Int](7)
+
+    val score_ = udf((xs: Int) => xs * 100.toDouble / max )
+
+    //dataframe con score
+    var scoreDF = minMax.withColumn("score",score_($"sum")).sort(desc("score"))
+
+    // bonus pagina senza traduzione
+    val translateBonus_ = udf((score: Double, transl: String) =>
+        if (transl == "" ) score+20 else score
+    )
+
+    scoreDF = scoreDF.withColumn("score",translateBonus_($"score", $"id_pagina_tradotta")).sort(desc("score"))
 
 
 

@@ -219,6 +219,8 @@ package Utilities {
       APIPageView.resetErrorList()
       APIRedirect.resetErrorList()
 
+      this.memoryInfo()
+
 
 
 
@@ -260,6 +262,8 @@ package Utilities {
 
       }).persist
 
+      this.memoryInfo()
+
       val tempDataFrameDst = tempResultDst.toDF("id", "id_pagina_originale", "num_visualiz_anno", "num_visualiz_mesi", "byte_dim_page", "id_redirect")
 
       val joinedDataFrameDst = dataFrameDst.join(errorPagesDst, dataFrameDst("id") === errorPagesDst("id2"), "inner").
@@ -269,6 +273,8 @@ package Utilities {
       val noErrorDataFrameDst = dataFrameDst.except(joinedDataFrameDst)
 
       val resultDst = noErrorDataFrameDst.union(tempDataFrameDst)
+
+      this.memoryInfo()
 
       resultDst.write.parquet(outputFolderName + folderSeparator + "it")
 
@@ -372,6 +378,16 @@ package Utilities {
       val bw = new BufferedWriter(new FileWriter(file, true))
       listErrors.foreach( ErrorTuple => bw.write(ErrorTuple._1 + ": " + ErrorTuple._2.map(tuple => "(" + tuple._1 + " , " + tuple._2  + ")" + "\t") + "\n"))
       bw.close()
+    }
+
+    def memoryInfo(): Unit = {
+      val mb = 1024*1024
+      val runtime = Runtime.getRuntime
+      println("ALL RESULTS IN MB")
+      println("** Used Memory:  " + (runtime.totalMemory - runtime.freeMemory) / mb)
+      println("** Free Memory:  " + runtime.freeMemory / mb)
+      println("** Total Memory: " + runtime.totalMemory / mb)
+      println("** Max Memory:   " + runtime.maxMemory / mb)
     }
   }
 }

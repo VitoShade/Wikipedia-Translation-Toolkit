@@ -1,12 +1,11 @@
-import java.net.URLDecoder
-import java.nio.charset.StandardCharsets
-import API.{APILangLinks, APIPageView, APIRedirect}
-import org.apache.spark.sql.{DataFrame, SparkSession}
 import Utilities._
-import org.apache.commons.io.FileUtils
-import org.apache.spark.sql.functions.{col, collect_set, desc, sum, when}
-import java.io.File
+import org.apache.spark.sql.SparkSession
+import org.apache.spark.sql.functions.{col, desc, lit}
+import org.apache.spark.sql.types.IntegerType
+
 import scala.collection.mutable.{WrappedArray => WA}
+import org.apache.spark.sql.functions.udf
+import scala.math._
 
 object analyseData extends App {
   override def main(args: Array[String]) {
@@ -19,198 +18,56 @@ object analyseData extends App {
     //per convertire RDD in DataFrame
     import sparkSession.implicits._
 
-    val startTime = System.currentTimeMillis()
-
-    //val inputFolderName  = "C:\\Users\\nik_9\\Desktop\\prova\\outputProcessati"
-    //val tempFolderName   = "C:\\Users\\nik_9\\Desktop\\prova\\tempOutput"
-    val tempFolderName  = "C:\\Users\\nik_9\\Desktop\\prova\\outputProcessati"
-    val outputFolderName = "C:\\Users\\nik_9\\Desktop\\prova\\datiFinali"
+    val inputFolderName = "C:\\Users\\nik_9\\Desktop\\prova\\datiFinali"
     val errorFolderName  = "C:\\Users\\nik_9\\Desktop\\prova\\datiFinali\\error"
     val sizeFolderName   = "C:\\Users\\nik_9\\Desktop\\prova\\datiFinali\\size"
     val folderSeparator = "\\"
 
-    //DataFrameUtility.retryPagesWithErrorAndReplace(inputFolderName, tempFolderName, errorFolderName, folderSeparator, sparkSession)
-
-    APILangLinks.resetErrorList()
-    APIPageView.resetErrorList()
-    APIRedirect.resetErrorList()
-
     //dataFrame dai parquet inglesi
-    val dataFrameSrc = DataFrameUtility.dataFrameFromFoldersRecursively(Array(tempFolderName), "en", sparkSession)
+    val dataFrameSrc = DataFrameUtility.dataFrameFromFoldersRecursively(Array(inputFolderName), "en", sparkSession)
 
-    val explodedSrc = dataFrameSrc.select("id", "num_traduzioni", "id_redirect", "id_pagina_tradotta","num_visualiz_anno", "num_visualiz_mesi", "byte_dim_page")
-                            .map(row => ( row.getAs[String](0),
-                                          row.getAs[Int](1),
-                                          row.getAs[String](2),
-                                          row.getAs[String](3),
-                                          row.getAs[WA[Int]](4)(0),
-                                          row.getAs[WA[Int]](4)(1),
-                                          row.getAs[WA[Int]](4)(2),
-                                          row.getAs[WA[Int]](5)(0),
-                                          row.getAs[WA[Int]](5)(1),
-                                          row.getAs[WA[Int]](5)(2),
-                                          row.getAs[WA[Int]](5)(3),
-                                          row.getAs[WA[Int]](5)(4),
-                                          row.getAs[WA[Int]](5)(5),
-                                          row.getAs[WA[Int]](5)(6),
-                                          row.getAs[WA[Int]](5)(7),
-                                          row.getAs[WA[Int]](5)(8),
-                                          row.getAs[WA[Int]](5)(9),
-                                          row.getAs[WA[Int]](5)(10),
-                                          row.getAs[WA[Int]](5)(11),
-                                          row.getAs[Int](6)
-                                        )
-                            ).toDF("id", "num_traduzioni", "id_redirect", "id_pagina_tradotta", "num_visualiz_anno1", "num_visualiz_anno2", "num_visualiz_anno3", "num_visualiz_mesi1", "num_visualiz_mesi2","num_visualiz_mesi3","num_visualiz_mesi4","num_visualiz_mesi5","num_visualiz_mesi6","num_visualiz_mesi7","num_visualiz_mesi8","num_visualiz_mesi9","num_visualiz_mesi10","num_visualiz_mesi11","num_visualiz_mesi12","byte_dim_page")
+    val startTime = System.currentTimeMillis()
 
-    //val rowProva = Seq(("prova123", 0, "Navapur", "tradotta123", 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0)).toDF("id", "num_traduzioni", "id_redirect", "id_pagina_tradotta", "num_visualiz_anno1", "num_visualiz_anno2", "num_visualiz_anno3", "num_visualiz_mesi1", "num_visualiz_mesi2","num_visualiz_mesi3","num_visualiz_mesi4","num_visualiz_mesi5","num_visualiz_mesi6","num_visualiz_mesi7","num_visualiz_mesi8","num_visualiz_mesi9","num_visualiz_mesi10","num_visualiz_mesi11","num_visualiz_mesi12","byte_dim_page")
 
-    //somma del numero di visualizzazioni per pagine che sono redirect
-    val redirectSrc = explodedSrc.filter("id_redirect != ''")
-      .drop("num_traduzioni")
-      .drop("byte_dim_page")
-      .groupBy("id_redirect")
-      .agg(
-        sum($"num_visualiz_anno1"),
-        sum($"num_visualiz_anno2"),
-        sum($"num_visualiz_anno3"),
-        sum($"num_visualiz_mesi1"),
-        sum($"num_visualiz_mesi2"),
-        sum($"num_visualiz_mesi3"),
-        sum($"num_visualiz_mesi4"),
-        sum($"num_visualiz_mesi5"),
-        sum($"num_visualiz_mesi6"),
-        sum($"num_visualiz_mesi7"),
-        sum($"num_visualiz_mesi8"),
-        sum($"num_visualiz_mesi9"),
-        sum($"num_visualiz_mesi10"),
-        sum($"num_visualiz_mesi11"),
-        sum($"num_visualiz_mesi12"),
-        collect_set(when(!(col("id_pagina_tradotta") === ""), col("id_pagina_tradotta"))).as("id_traduzioni_redirect")
-      ).withColumnRenamed("id_redirect","id")
+    //"id", "num_traduzioni", "id_pagina_tradotta", "num_visualiz_anno", "num_visualiz_mesi", "byte_dim_page", "id_traduzioni_redirect"
 
-    //somma del numero di visualizzazioni delle redirect alle pagine principali
-    val compressedSrc = explodedSrc.filter("id_redirect == ''")
-                        .join(redirectSrc, Seq("id"), "left_outer")
-                        .map(row => ( row.getAs[String](0),
-                                      row.getAs[Int](1),
-                                      row.getAs[String](3),
-                                      (4 to 6) map ( i => row.getAs[Int](i)+row.getAs[Long](i+16)),
-                                      (7 to 18) map ( i => row.getAs[Int](i)+row.getAs[Long](i+16)),
-                                      row.getAs[Int](19),
-                                      if(row.getAs[WA[String]](35) != null) row.getAs[WA[String]](35) else WA.empty[String]
-                                    )
-                        ).toDF("id", "num_traduzioni", "id_pagina_tradotta", "num_visualiz_anno", "num_visualiz_mesi", "byte_dim_page", "id_traduzioni_redirect")
 
-    //compressedSrc.show(false)
 
-    //compressedSrc.orderBy(desc("id_traduzioni_redirect")).show(false)
 
-    //dataFrame dai parquet italiani
-    var dataFrameDst = DataFrameUtility.dataFrameFromFoldersRecursively(Array(tempFolderName), "it", sparkSession).dropDuplicates()
+    val sum_ = udf((xs: WA[Int]) => xs.sum)
 
-    //dataFrameDst.show(50, false)
 
-    //val rowProva = Seq(("Astronavi_e_veicoli_di_Guerre_stellari", "tradotta123", Array(0, 0, 0), Array(0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0), 0, "")).toDF("id", "id_pagina_originale", "num_visualiz_anno", "num_visualiz_mesi", "byte_dim_page", "id_redirect")
-    //dataFrameDst=dataFrameDst.union(rowProva)
+    //def geoEncode(level: Int) = udf( (lat: Double, long: Double) => GeoHex.encode(lat, long, level)) df.withColumn("code", geoEncode(9)($"resolved_lat", $"resolved_lon")).show
 
-    FileUtils.forceMkdir(new File(errorFolderName))
+    // Somma visualizzazioni anno
+    val minMax = dataFrameSrc.withColumn("sum", sum_($"num_visualiz_anno")).sort(desc("sum"))
 
-    dataFrameDst = missingIDsDF(dataFrameDst, errorFolderName, folderSeparator, sparkSession).dropDuplicates()
 
-    //dataFrameDst.show(50, false)
+    val max = minMax.first().getAs[Int](7)
 
-    /*val explodedDst = dataFrameDst.select("id", "id_redirect", "id_pagina_originale","num_visualiz_anno", "num_visualiz_mesi", "byte_dim_page")
-                                  .map(row => ( row.getAs[String](0),
-                                                row.getAs[String](1),
-                                                row.getAs[String](2),
-                                                row.getAs[WA[Int]](3)(0),
-                                                row.getAs[WA[Int]](3)(1),
-                                                row.getAs[WA[Int]](3)(2),
-                                                row.getAs[WA[Int]](4)(0),
-                                                row.getAs[WA[Int]](4)(1),
-                                                row.getAs[WA[Int]](4)(2),
-                                                row.getAs[WA[Int]](4)(3),
-                                                row.getAs[WA[Int]](4)(4),
-                                                row.getAs[WA[Int]](4)(5),
-                                                row.getAs[WA[Int]](4)(6),
-                                                row.getAs[WA[Int]](4)(7),
-                                                row.getAs[WA[Int]](4)(8),
-                                                row.getAs[WA[Int]](4)(9),
-                                                row.getAs[WA[Int]](4)(10),
-                                                row.getAs[WA[Int]](4)(11),
-                                                row.getAs[Int](5)
-                                              )
-                                  ).toDF("id", "id_redirect", "id_pagina_originale", "num_visualiz_anno1", "num_visualiz_anno2", "num_visualiz_anno3", "num_visualiz_mesi1", "num_visualiz_mesi2","num_visualiz_mesi3","num_visualiz_mesi4","num_visualiz_mesi5","num_visualiz_mesi6","num_visualiz_mesi7","num_visualiz_mesi8","num_visualiz_mesi9","num_visualiz_mesi10","num_visualiz_mesi11","num_visualiz_mesi12","byte_dim_page")
+    val score_ = udf((xs: Int) => xs * 100.toDouble / max )
 
-    val redirectDst = explodedDst.filter("id_redirect != ''")
-                                 .drop("byte_dim_page")
-                                 .groupBy("id_redirect")
-                                 .agg(sum($"num_visualiz_anno1"),
-                                      sum($"num_visualiz_anno2"),
-                                      sum($"num_visualiz_anno3"),
-                                      sum($"num_visualiz_mesi1"),
-                                      sum($"num_visualiz_mesi2"),
-                                      sum($"num_visualiz_mesi3"),
-                                      sum($"num_visualiz_mesi4"),
-                                      sum($"num_visualiz_mesi5"),
-                                      sum($"num_visualiz_mesi6"),
-                                      sum($"num_visualiz_mesi7"),
-                                      sum($"num_visualiz_mesi8"),
-                                      sum($"num_visualiz_mesi9"),
-                                      sum($"num_visualiz_mesi10"),
-                                      sum($"num_visualiz_mesi11"),
-                                      sum($"num_visualiz_mesi12"),
-                                      collect_set(when(!(col("id_pagina_originale") === ""), col("id_pagina_originale"))).as("id_originale_redirect")
-                                ).withColumnRenamed("id_redirect","id")
+    //dataframe con score
+    var scoreDF = minMax.withColumn("score",score_($"sum")).sort(desc("score"))
 
-    val compressedDst = explodedDst.filter("id_redirect == ''")
-      .join(redirectDst, Seq("id"), "left_outer")
-      .map(row => ( row.getAs[String](0),
-                    row.getAs[String](2),
-                    (3 to 5) map ( i => row.getAs[Int](i)+row.getAs[Long](i+16)),
-                    (6 to 17) map ( i => row.getAs[Int](i)+row.getAs[Long](i+16)),
-                    row.getAs[Int](18),
-                    if(row.getAs[WA[String]](34) != null) row.getAs[WA[String]](34) else WA.empty[String]
-      )
-      ).toDF("id", "id_originale", "num_visualiz_anno", "num_visualiz_mesi", "byte_dim_page", "id_originali_redirect")
-    */
+    // bonus pagina senza traduzione
+    val translateBonus_ = udf((score: Double, byteIt: Int, byteEn: Int) =>
+      // se somma traduzioni inglese = null
+      //      byteEn = byte_dim_page
+      // else
+      //      byteEn = sum_byte_en
+      // byteIt = byte_pagina_tradotta + sum(byte traduzioni redirect)
+      score + 20.0 * ((byteEn - byteIt).toDouble/ math.max(byteEn, byteIt))
+    )
 
-    //pagine inglesi che hanno avuto errori con le API
-    val errorPagesSrc = DataFrameUtility.collectErrorPagesFromFoldersRecursively(Array(tempFolderName), sparkSession, false).toDF("id2")
+    scoreDF = scoreDF.withColumn("score",translateBonus_($"score", $"id_pagina_tradotta")).sort(desc("score"))
 
-    //sottoinsieme delle pagine inglesi compresse che hanno avuto problemi
-    val joinedCompressedSrc = compressedSrc.join(errorPagesSrc, compressedSrc("id") === errorPagesSrc("id2"), "inner").
-      select("id", "num_traduzioni", "id_pagina_tradotta", "num_visualiz_anno", "num_visualiz_mesi", "byte_dim_page", "id_traduzioni_redirect")
 
-    //rimozione dalle pagine compresse di quelle con errori
-    val resultDataFrameSrc = compressedSrc.except(joinedCompressedSrc)
 
-    println("checkpoint 1")
 
-    //pagine italiane che hanno avuto errori con le API
-    val errorPagesDst = DataFrameUtility.collectErrorPagesFromFoldersRecursively(Array(tempFolderName), sparkSession, true).toDF("id2")
 
-    //sottoinsieme delle pagine italiane compresse che hanno avuto problemi
-    val joinedCompressedDst = dataFrameDst.join(errorPagesDst, dataFrameDst("id") === errorPagesDst("id2"), "inner").
-      select("id", "id_pagina_originale", "num_visualiz_anno", "num_visualiz_mesi", "byte_dim_page", "id_redirect")
 
-    //rimozione dalle pagine compresse di quelle con errori
-    val resultDataFrameDst = dataFrameDst.except(joinedCompressedDst)
 
-    val dimPageDF = makeNewDF(resultDataFrameSrc, dataFrameDst)
-
-    //FileUtils.deleteDirectory(new File(outputFolderName))
-    FileUtils.deleteDirectory(new File(sizeFolderName))
-
-    //resultDataFrameSrc.write.parquet(outputFolderName + folderSeparator + "en")
-    //resultDataFrameDst.write.parquet(outputFolderName + folderSeparator + "it")
-
-    println("checkpoint 2")
-
-    dimPageDF.write.parquet(sizeFolderName)
-
-    //redirectDst.show(10,false)
-    //compressedDst.show(20, false)
 
     val endTime = System.currentTimeMillis()
 
@@ -221,65 +78,5 @@ object analyseData extends App {
 
     //ferma anche lo sparkContext
     sparkSession.stop()
-  }
-
-  def missingIDsDF(dataFrameDst: DataFrame, errorFolderName: String, folderSeparator: String, sparkSession: SparkSession) = {
-    import sparkSession.implicits._
-
-    val idDF = dataFrameDst.select("id").rdd.map(_.getAs[String](0)).collect().toList
-
-    val dataFrame = dataFrameDst.union(dataFrameDst.filter(!(col("id_redirect") === "") && !(col("id_redirect").isin(idDF: _*))).select("id_redirect").map(line => {
-      val tuple1 = APILangLinks.callAPI(line.getAs[String](0), "it", "en")
-      val tuple2 = APIPageView.callAPI(line.getAs[String](0), "it")
-      val tuple3 = APIRedirect.callAPI(line.getAs[String](0), "it")
-
-      (line.getAs[String](0), URLDecoder.decode(tuple1._2,  StandardCharsets.UTF_8), tuple2._1, tuple2._2, tuple3._1, tuple3._2)
-    }).toDF("id", "id_pagina_originale", "num_visualiz_anno", "num_visualiz_mesi", "byte_dim_page", "id_redirect"))
-
-    //salvataggio degli errori per le API di it.wikipedia
-    DataFrameUtility.writeFileID(errorFolderName + folderSeparator + "errorLangLinksTranslated.txt", APILangLinks.obtainErrorID())
-    DataFrameUtility.writeFileID(errorFolderName + folderSeparator + "errorViewTranslated.txt",      APIPageView.obtainErrorID())
-    DataFrameUtility.writeFileID(errorFolderName + folderSeparator + "errorRedirectTranslated.txt",  APIRedirect.obtainErrorID())
-
-    DataFrameUtility.writeFileErrors(errorFolderName + folderSeparator + "errorLangLinksTranslatedDetails.txt", APILangLinks.obtainErrorDetails())
-    DataFrameUtility.writeFileErrors(errorFolderName + folderSeparator + "errorViewTranslatedDetails.txt",      APIPageView.obtainErrorDetails())
-    DataFrameUtility.writeFileErrors(errorFolderName + folderSeparator + "errorRedirectTranslatedDetails.txt",  APIRedirect.obtainErrorDetails())
-
-    dataFrame
-  }
-
-  def makeNewDF(mainDF: DataFrame, transDF: DataFrame) = {
-
-    val tmp_DF = transDF.filter("id_redirect!=''")
-                        .select("id", "id_redirect")
-                        .withColumnRenamed("id","id_traduzione")
-                        .withColumnRenamed("id_redirect","id_redirect_traduzione")
-
-    println("tmp_DF " + tmp_DF.count())
-
-    val new_DF = mainDF.select("id", "id_pagina_tradotta", "byte_dim_page")
-                       .join(tmp_DF, mainDF("id_pagina_tradotta")===tmp_DF("id_traduzione"))
-                       .drop("id_pagina_tradotta")
-                       .drop("id_traduzione")
-                       .withColumnRenamed("id_redirect_traduzione","id_pagina_tradotta")
-                       .withColumnRenamed("byte_dim_page","byte_dim_page_tradotta")
-
-    println("new_DF " + new_DF.count())
-
-    //new_DF.show(50, false)
-
-    val sum_DF = new_DF.groupBy("id_pagina_tradotta").sum().withColumnRenamed("sum(byte_dim_page_tradotta)","byte_dim_page_totale")
-
-    println("sum_DF " + sum_DF.count())
-
-    //sum_DF.show(50, false)
-
-    val dims_DF = sum_DF.join(transDF.select("id", "byte_dim_page"), sum_DF("id_pagina_tradotta")===transDF("id"))
-      .drop("id")
-      .withColumnRenamed("id_pagina_tradotta", "id_tmp")
-
-    println("dims_DF " + dims_DF.count())
-
-    new_DF.join(dims_DF, new_DF("id_pagina_tradotta")===dims_DF("id_tmp")).drop("id_tmp")
   }
 }
