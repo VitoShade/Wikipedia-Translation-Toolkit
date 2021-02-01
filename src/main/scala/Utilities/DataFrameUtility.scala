@@ -203,7 +203,9 @@ package Utilities {
 
       val resultSrc = noErrorDataFrameSrc.union(tempDataFrameSrc)
 
-      resultSrc.write.parquet(outputFolderName + folderSeparator + "en")
+      val coalescedSrc = resultSrc.coalesce(30)
+
+      coalescedSrc.write.parquet(outputFolderName + folderSeparator + "en")
 
       //salvataggio degli errori per le API di en.wikipedia
       this.writeFileID(errorFolderName + folderSeparator + "errorLangLinks.txt", APILangLinks.obtainErrorID())
@@ -270,7 +272,9 @@ package Utilities {
 
       val resultDst = noErrorDataFrameDst.union(tempDataFrameDst)
 
-      resultDst.write.parquet(outputFolderName + folderSeparator + "it")
+      val coalescedDst = resultDst.coalesce(7)
+
+      coalescedDst.write.parquet(outputFolderName + folderSeparator + "it")
 
       //salvataggio degli errori per le API di it.wikipedia
       this.writeFileID(errorFolderName + folderSeparator + "errorLangLinksTranslated.txt", APILangLinks.obtainErrorID())
@@ -371,6 +375,16 @@ package Utilities {
       val bw = new BufferedWriter(new FileWriter(file, true))
       listErrors.foreach( ErrorTuple => bw.write(ErrorTuple._1 + ": " + ErrorTuple._2.map(tuple => "(" + tuple._1 + " , " + tuple._2  + ")" + "\t") + "\n"))
       bw.close()
+    }
+
+    def memoryInfo(): Unit = {
+      val mb = 1024*1024
+      val runtime = Runtime.getRuntime
+      println("ALL RESULTS IN MB")
+      println("** Used Memory:  " + (runtime.totalMemory - runtime.freeMemory) / mb)
+      println("** Free Memory:  " + runtime.freeMemory / mb)
+      println("** Total Memory: " + runtime.totalMemory / mb)
+      println("** Max Memory:   " + runtime.maxMemory / mb)
     }
   }
 }
