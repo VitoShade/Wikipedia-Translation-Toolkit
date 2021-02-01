@@ -13,7 +13,7 @@ import scala.collection.mutable.{WrappedArray => WA}
 object prepareData extends App {
   override def main(args: Array[String]) {
 
-    val sparkSession = SparkSession.builder().master("local[16]").appName("prepareData").getOrCreate()
+    val sparkSession = SparkSession.builder().master("local[8]").appName("prepareData").getOrCreate()
     val sparkContext = sparkSession.sparkContext
 
     sparkContext.setLogLevel("WARN")
@@ -25,17 +25,17 @@ object prepareData extends App {
 
     val inputFolderName  = "C:\\Users\\nik_9\\Desktop\\prova\\outputProcessati"
     val tempFolderName   = "C:\\Users\\nik_9\\Desktop\\prova\\tempOutput"
+    val errorFolderName  = "C:\\Users\\nik_9\\Desktop\\prova\\tempOutput\\error"
     val outputFolderName = "C:\\Users\\nik_9\\Desktop\\prova\\datiFinali"
-    val errorFolderName  = "C:\\Users\\nik_9\\Desktop\\prova\\datiFinali\\error"
     val sizeFolderName   = "C:\\Users\\nik_9\\Desktop\\prova\\datiFinali\\size"
     val folderSeparator = "\\"
 
     // Retry errori durante downloadData e pulizia link a pagine italiane
-    /*FileUtils.deleteDirectory(new File(errorFolderName))
+    FileUtils.deleteDirectory(new File(errorFolderName))
     FileUtils.forceMkdir(new File(errorFolderName))
-    DataFrameUtility.retryPagesWithErrorAndReplace(inputFolderName, tempFolderName, errorFolderName, folderSeparator, sparkSession)*/
+    DataFrameUtility.retryPagesWithErrorAndReplace(inputFolderName, tempFolderName, errorFolderName, folderSeparator, sparkSession)
 
-    APILangLinks.resetErrorList()
+    /*APILangLinks.resetErrorList()
     APIPageView.resetErrorList()
     APIRedirect.resetErrorList()
 
@@ -53,7 +53,7 @@ object prepareData extends App {
     dataFrameDst = missingIDsDF(dataFrameDst, errorFolderName, folderSeparator, sparkSession).dropDuplicates()
 
     // Cancellazione pagine con errori
-    val (resultDataFrameSrc, resultDataFrameDst) = removeErrorPages(compressedSrc, dataFrameDst, sparkSession, tempFolderName, errorFolderName)
+    val (resultDataFrameSrc, resultDataFrameDst) = removeErrorPages(compressedSrc, dataFrameDst, sparkSession, tempFolderName)
 
     // Creazione DataFrame dimensioni
     val dimPageDF = makeDimDF(resultDataFrameSrc, dataFrameDst, sparkSession)
@@ -67,7 +67,7 @@ object prepareData extends App {
 
     //Controllo se è corretto
     val removeEmpty = udf((array: Seq[String]) => !array.isEmpty)
-    dimPageDF.filter(removeEmpty($"id_redirect")).show(10, false)
+    dimPageDF.filter(removeEmpty($"id_redirect")).show(10, false)*/
 
     val endTime = System.currentTimeMillis()
 
@@ -160,7 +160,7 @@ object prepareData extends App {
       val tuple3 = APIRedirect.callAPI(line.getAs[String](0), "it")
 
       (line.getAs[String](0), URLDecoder.decode(tuple1._2,  StandardCharsets.UTF_8), tuple2._1, tuple2._2, tuple3._1, tuple3._2)
-    }).toDF("id", "id_pagina_originale", "num_visualiz_anno", "num_visualiz_mesi", "byte_dim_page", "id_redirect")).persist
+    }).toDF("id", "id_pagina_originale", "num_visualiz_anno", "num_visualiz_mesi", "byte_dim_page", "id_redirect"))
 
     //salvataggio degli errori per le API di it.wikipedia
     DataFrameUtility.writeFileID(errorFolderName + folderSeparator + "errorLangLinksTranslated.txt", APILangLinks.obtainErrorID())
@@ -174,7 +174,7 @@ object prepareData extends App {
     dataFrame
   }
 
-  def removeErrorPages(compressedSrc: DataFrame, dataFrameDst:DataFrame, sparkSession: SparkSession, tempFolderName: String, errorFolderName: String ) = {
+  def removeErrorPages(compressedSrc: DataFrame, dataFrameDst:DataFrame, sparkSession: SparkSession, tempFolderName: String) = {
 
     //pagine inglesi che hanno avuto errori con le API
     val errorPagesSrc = DataFrameUtility.collectErrorPagesFromFoldersRecursively(Array(tempFolderName), sparkSession, false).toDF("id2")
