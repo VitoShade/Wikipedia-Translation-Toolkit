@@ -208,7 +208,7 @@ package Utilities {
 
       val resultSrc = noErrorDataFrameSrc.union(tempDataFrameSrc)
 
-      resultSrc.write.parquet(outputFolderName + folderSeparator + "en")
+      resultSrc.repartition(numPartitions).write.parquet(outputFolderName + folderSeparator + "en")
 
       //salvataggio degli errori per le API di en.wikipedia
       this.writeFileID(errorFolderName + folderSeparator + "errorLangLinks.txt", APILangLinks.obtainErrorID())
@@ -275,7 +275,9 @@ package Utilities {
 
       val resultDst = noErrorDataFrameDst.union(tempDataFrameDst)
 
-      resultDst.write.parquet(outputFolderName + folderSeparator + "it")
+      println("result " + resultDst.rdd.getNumPartitions)
+
+      resultDst.repartition(numPartitions).write.parquet(outputFolderName + folderSeparator + "it")
 
       //salvataggio degli errori per le API di it.wikipedia
       this.writeFileID(errorFolderName + folderSeparator + "errorLangLinksTranslated.txt", APILangLinks.obtainErrorID())

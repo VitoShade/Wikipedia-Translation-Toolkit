@@ -14,6 +14,8 @@ object showData extends App {
 
     sparkContext.setLogLevel("WARN")
 
+    (0 to 3).map(j => {})
+
 
     val inputFolderName = "C:\\Users\\nik_9\\Desktop\\prova\\outputProcessati"
     val outputFolderName = "C:\\Users\\nik_9\\Desktop\\prova\\datiFinali"
