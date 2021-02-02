@@ -12,6 +12,8 @@ package Utilities {
 
   object DataFrameUtility {
 
+    val numPartitions = 8
+
     def collectParquetFilesFromFolders(folders: Array[String]): Array[String] = {
 
       var allParquetFiles = Array[String]()
@@ -163,7 +165,7 @@ package Utilities {
       //dataFrame dai parquet inglesi
       val dataFrameSrc = this.dataFrameFromFoldersRecursively(Array(inputFolderName), "en", sparkSession)
 
-      val errorPagesSrc = this.collectErrorPagesFromFoldersRecursively(Array(inputFolderName), sparkSession, false).toDF("id2").persist
+      val errorPagesSrc = this.collectErrorPagesFromFoldersRecursively(Array(inputFolderName), sparkSession, false).toDF("id2")
 
       var counter = 0
 
@@ -171,6 +173,7 @@ package Utilities {
       APILangLinks.resetErrorList()
       APIPageView.resetErrorList()
       APIRedirect.resetErrorList()
+
 
       val tempResultSrc = errorPagesSrc.map(page => {
 
@@ -190,22 +193,22 @@ package Utilities {
 
         (line, tuple1._1, URLDecoder.decode(tuple1._2,  StandardCharsets.UTF_8), tuple2._1, tuple2._2, tuple3._1, tuple3._2)
 
-      }).persist
+      }).repartition(numPartitions)
 
       //creazione del DataFrame per en.wikipedia
       val tempDataFrameSrc = tempResultSrc.toDF("id", "num_traduzioni", "id_pagina_tradotta", "num_visualiz_anno", "num_visualiz_mesi", "byte_dim_page", "id_redirect")
+
+      tempDataFrameSrc.persist
 
       val joinedDataFrameSrc = dataFrameSrc.join(errorPagesSrc, dataFrameSrc("id") === errorPagesSrc("id2"), "inner").
         select("id", "num_traduzioni", "id_pagina_tradotta", "num_visualiz_anno", "num_visualiz_mesi", "byte_dim_page", "id_redirect")
 
       //rimozione dalle pagine compresse di quelle con errori
-      val noErrorDataFrameSrc = dataFrameSrc.except(joinedDataFrameSrc)
+      val noErrorDataFrameSrc = dataFrameSrc.except(joinedDataFrameSrc).repartition(numPartitions)
 
       val resultSrc = noErrorDataFrameSrc.union(tempDataFrameSrc)
 
-      val coalescedSrc = resultSrc.coalesce(30)
-
-      coalescedSrc.write.parquet(outputFolderName + folderSeparator + "en")
+      resultSrc.repartition(numPartitions).write.parquet(outputFolderName + folderSeparator + "en")
 
       //salvataggio degli errori per le API di en.wikipedia
       this.writeFileID(errorFolderName + folderSeparator + "errorLangLinks.txt", APILangLinks.obtainErrorID())
@@ -221,21 +224,21 @@ package Utilities {
       APIPageView.resetErrorList()
       APIRedirect.resetErrorList()
 
-
-
+      //pagine italiane da scaricare perché trovate con il retry della pagina inglese
+      val newDstPages = tempDataFrameSrc.select("id_pagina_tradotta").filter("id_pagina_tradotta != ''").toDF("id2")
 
       //dataFrame dei parquet italiani
       val dataFrameDst = this.dataFrameFromFoldersRecursively(Array(inputFolderName), "it", sparkSession)
 
-      val errorPagesDst = this.collectErrorPagesFromFoldersRecursively(Array(inputFolderName), sparkSession, true).toDF("id2").persist
+      var errorPagesDst = this.collectErrorPagesFromFoldersRecursively(Array(inputFolderName), sparkSession, true).toDF("id2")
+
+      errorPagesDst = errorPagesDst.union(newDstPages)
 
       val dstPagesWithHash = errorPagesDst.filter(x => {x.getString(0).contains("#")})
 
       val dstPagesToRetryWithoutHash = errorPagesDst.except(dstPagesWithHash)
 
       val dstPagesToRetryWithHash = dstPagesWithHash.map(x => {
-
-        //if(x.getString(0) != "") println(x)
         x.getString(0).split("#")(0)
       }).toDF("id2")
 
@@ -260,7 +263,7 @@ package Utilities {
 
         (line, URLDecoder.decode(tuple1._2,  StandardCharsets.UTF_8), tuple2._1, tuple2._2, tuple3._1, tuple3._2)
 
-      }).persist
+      }).repartition(numPartitions)
 
       val tempDataFrameDst = tempResultDst.toDF("id", "id_pagina_originale", "num_visualiz_anno", "num_visualiz_mesi", "byte_dim_page", "id_redirect")
 
@@ -268,13 +271,13 @@ package Utilities {
         select("id", "id_pagina_originale", "num_visualiz_anno", "num_visualiz_mesi", "byte_dim_page", "id_redirect")
 
       //rimozione dalle pagine compresse di quelle con errori
-      val noErrorDataFrameDst = dataFrameDst.except(joinedDataFrameDst)
+      val noErrorDataFrameDst = dataFrameDst.except(joinedDataFrameDst).repartition(numPartitions)
 
       val resultDst = noErrorDataFrameDst.union(tempDataFrameDst)
 
-      val coalescedDst = resultDst.coalesce(7)
 
-      coalescedDst.write.parquet(outputFolderName + folderSeparator + "it")
+
+      resultDst.repartition(numPartitions).write.parquet(outputFolderName + folderSeparator + "it")
 
       //salvataggio degli errori per le API di it.wikipedia
       this.writeFileID(errorFolderName + folderSeparator + "errorLangLinksTranslated.txt", APILangLinks.obtainErrorID())
@@ -287,7 +290,7 @@ package Utilities {
 
     }
 
-    def DEBUG_newDataFrame(inputFolderName: Array[String], sparkSession: SparkSession) = {
+    def DEBUG_newDataFrame(inputFolderName: Array[String], sparkSession: SparkSession): Unit = {
       //per convertire RDD in DataFrame
 
       var allParquetFiles = Array[String]()
@@ -337,7 +340,7 @@ package Utilities {
       dataFrameSrc*/
     }
 
-    def DEBUG_joinDataFrame(folder: String, sparkSession: SparkSession) = {
+    def DEBUG_joinDataFrame(folder: String, sparkSession: SparkSession): Unit = {
 
       import sparkSession.implicits._
 
@@ -376,6 +379,16 @@ package Utilities {
       val bw = new BufferedWriter(new FileWriter(file, true))
       listErrors.foreach( ErrorTuple => bw.write(ErrorTuple._1 + ": " + ErrorTuple._2.map(tuple => "(" + tuple._1 + " , " + tuple._2  + ")" + "\t") + "\n"))
       bw.close()
+    }
+
+    def memoryInfo(): Unit = {
+      val mb = 1024*1024
+      val runtime = Runtime.getRuntime
+      println("ALL RESULTS IN MB")
+      println("** Used Memory:  " + (runtime.totalMemory - runtime.freeMemory) / mb)
+      println("** Free Memory:  " + runtime.freeMemory / mb)
+      println("** Total Memory: " + runtime.totalMemory / mb)
+      println("** Max Memory:   " + runtime.maxMemory / mb)
     }
   }
 }

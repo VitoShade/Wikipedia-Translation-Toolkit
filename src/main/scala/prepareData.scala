@@ -57,7 +57,6 @@ object prepareData extends App {
     // Cancellazione pagine con errori
     val (resultDataFrameSrc, resultDataFrameDst) = removeErrorPages(compressedSrc, dataFrameDst, sparkSession, tempFolderName)
 
-    println("start makeDimDF")
     // Creazione DataFrame dimensioni
     val dimPageDF = makeDimDF(resultDataFrameSrc, resultDataFrameDst, sparkSession)
 
@@ -164,7 +163,7 @@ object prepareData extends App {
       val tuple3 = APIRedirect.callAPI(line.getAs[String](0), "it")
 
       (line.getAs[String](0), URLDecoder.decode(tuple1._2,  StandardCharsets.UTF_8), tuple2._1, tuple2._2, tuple3._1, tuple3._2)
-    }).toDF("id", "id_pagina_originale", "num_visualiz_anno", "num_visualiz_mesi", "byte_dim_page", "id_redirect")).persist
+    }).toDF("id", "id_pagina_originale", "num_visualiz_anno", "num_visualiz_mesi", "byte_dim_page", "id_redirect"))
 
     //salvataggio degli errori per le API di it.wikipedia
     DataFrameUtility.writeFileID(errorFolderName + folderSeparator + "errorLangLinksTranslated.txt", APILangLinks.obtainErrorID())
@@ -214,20 +213,15 @@ object prepareData extends App {
     val mappa2 = transDF.map(row => (row.getString(5), row.getInt(4))).collect().toMap.withDefaultValue(0)
 
     val res = mainDF.map(row => {
-      (row.getString(0), row.getInt(1), row.getString(2), row.getAs[mutable.WrappedArray[Int]](3), row.getAs[mutable.WrappedArray[Int]](4), row.getInt(5), row.getAs[mutable.WrappedArray[String]](6), mappa(row.getString(2)), mappa2(mappa(row.getString(2))))
-    }).toDF("id", "num_traduzioni", "id_pagina_tradotta", "num_visualiz_anno", "num_visualiz_mesi", "byte_dim_page", "id_redirect", "id_ita", "byte_dim_page_ita_original")
+      (row.getString(0), row.getString(2), row.getInt(5), row.getAs[mutable.WrappedArray[String]](6), mappa(row.getString(2)), mappa2(mappa(row.getString(2))))
+    }).toDF("id", "id_pagina_tradotta",  "byte_dim_page", "id_redirect", "id_ita", "byte_dim_page_ita_original")
 
     val sumDF = res.groupBy("id_ita")
       .sum("byte_dim_page")
       .withColumnRenamed("sum(byte_dim_page)","byte_dim_page_tot")
       .withColumnRenamed("id_ita", "id_ita2")
 
-    val dimsDF = res.join(sumDF, res("id_ita")=== sumDF("id_ita2"))
-      .drop("num_traduzioni")
-      .drop("num_visualiz_anno")
-      .drop("num_visualiz_mesi")
+    res.join(sumDF, res("id_ita") === sumDF("id_ita2"))
       .drop("id_ita2")
-
-    dimsDF
   }
 }

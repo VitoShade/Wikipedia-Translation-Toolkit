@@ -26,7 +26,6 @@ object showData extends App {
     val errorFolderName = "C:\\Users\\nik_9\\Desktop\\prova\\datiFinali\\error"
     val folderSeparator = "/"
 
-    DataFrameUtility.DEBUG_newDataFrame(Array(inputFolderName), sparkSession)
 
 
 
