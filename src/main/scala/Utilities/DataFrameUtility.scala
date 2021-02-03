@@ -275,8 +275,6 @@ package Utilities {
 
       val resultDst = noErrorDataFrameDst.union(tempDataFrameDst)
 
-      println("result " + resultDst.rdd.getNumPartitions)
-
       resultDst.repartition(numPartitions).write.parquet(outputFolderName + folderSeparator + "it")
 
       //salvataggio degli errori per le API di it.wikipedia

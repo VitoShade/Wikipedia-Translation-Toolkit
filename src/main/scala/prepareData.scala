@@ -31,11 +31,11 @@ object prepareData extends App {
     val folderSeparator = "\\"
 
     // Retry errori durante downloadData e pulizia link a pagine italiane
-    FileUtils.deleteDirectory(new File(errorFolderName))
+    /*FileUtils.deleteDirectory(new File(errorFolderName))
     FileUtils.forceMkdir(new File(errorFolderName))
-    DataFrameUtility.retryPagesWithErrorAndReplace(inputFolderName, tempFolderName, errorFolderName, folderSeparator, sparkSession)
+    DataFrameUtility.retryPagesWithErrorAndReplace(inputFolderName, tempFolderName, errorFolderName, folderSeparator, sparkSession)*/
 
-    /*APILangLinks.resetErrorList()
+    APILangLinks.resetErrorList()
     APIPageView.resetErrorList()
     APIRedirect.resetErrorList()
 
@@ -44,30 +44,32 @@ object prepareData extends App {
     val dataFrameSrc = DataFrameUtility.dataFrameFromFoldersRecursively(Array(tempFolderName), "en", sparkSession)
 
     // Compressione dataframe da tradurre (togliendo redirect)
-    val compressedSrc = compressRedirect(dataFrameSrc, sparkSession)
+    val compressedSrc = compressRedirect(dataFrameSrc, sparkSession).repartition(DataFrameUtility.numPartitions)
 
     // DataFrame dai parquet italiani
-    var dataFrameDst = DataFrameUtility.dataFrameFromFoldersRecursively(Array(tempFolderName), "it", sparkSession).dropDuplicates()
+    var dataFrameDst = DataFrameUtility.dataFrameFromFoldersRecursively(Array(tempFolderName), "it", sparkSession).dropDuplicates().repartition(DataFrameUtility.numPartitions)
 
     // Chiamata per scaricare pagine italiane che si ottengono tramite redirect
-    dataFrameDst = missingIDsDF(dataFrameDst, errorFolderName, folderSeparator, sparkSession).dropDuplicates()
+    dataFrameDst = missingIDsDF(dataFrameDst, errorFolderName, folderSeparator, sparkSession).dropDuplicates().repartition(DataFrameUtility.numPartitions)
 
     // Cancellazione pagine con errori
     val (resultDataFrameSrc, resultDataFrameDst) = removeErrorPages(compressedSrc, dataFrameDst, sparkSession, tempFolderName)
 
     // Creazione DataFrame dimensioni
-    val dimPageDF = makeDimDF(resultDataFrameSrc, dataFrameDst, sparkSession)
+    val dimPageDF = makeDimDF(resultDataFrameSrc, resultDataFrameDst, sparkSession)
 
     // Pulizia directory
     FileUtils.deleteDirectory(new File(outputFolderName + folderSeparator + "en"))
     FileUtils.deleteDirectory(new File(outputFolderName + folderSeparator + "it"))
+    //FileUtils.deleteDirectory(new File(sizeFolderName))
+
     //resultDataFrameSrc.write.parquet(outputFolderName + folderSeparator + "en")
     //resultDataFrameDst.write.parquet(outputFolderName + folderSeparator + "it")
     //dimPageDF.write.parquet(sizeFolderName)
 
     //Controllo se è corretto
     val removeEmpty = udf((array: Seq[String]) => !array.isEmpty)
-    dimPageDF.filter(removeEmpty($"id_redirect")).show(10, false)*/
+    dimPageDF.filter(removeEmpty($"id_traduzioni_redirect")).show(10, false)
 
     val endTime = System.currentTimeMillis()
 
@@ -160,7 +162,7 @@ object prepareData extends App {
       val tuple3 = APIRedirect.callAPI(line.getAs[String](0), "it")
 
       (line.getAs[String](0), URLDecoder.decode(tuple1._2,  StandardCharsets.UTF_8), tuple2._1, tuple2._2, tuple3._1, tuple3._2)
-    }).toDF("id", "id_pagina_originale", "num_visualiz_anno", "num_visualiz_mesi", "byte_dim_page", "id_redirect"))
+    }).toDF("id", "id_pagina_originale", "num_visualiz_anno", "num_visualiz_mesi", "byte_dim_page", "id_redirect")).persist
 
     //salvataggio degli errori per le API di it.wikipedia
     DataFrameUtility.writeFileID(errorFolderName + folderSeparator + "errorLangLinksTranslated.txt", APILangLinks.obtainErrorID())
@@ -174,8 +176,7 @@ object prepareData extends App {
     dataFrame
   }
 
-  def removeErrorPages(compressedSrc: DataFrame, dataFrameDst:DataFrame, sparkSession: SparkSession, tempFolderName: String) = {
-
+  def removeErrorPages(compressedSrc: DataFrame, dataFrameDst:DataFrame, sparkSession: SparkSession, tempFolderName: String ) = {
     //pagine inglesi che hanno avuto errori con le API
     val errorPagesSrc = DataFrameUtility.collectErrorPagesFromFoldersRecursively(Array(tempFolderName), sparkSession, false).toDF("id2")
 
@@ -196,34 +197,36 @@ object prepareData extends App {
     //rimozione dalle pagine compresse di quelle con errori
     val resultDataFrameDst = dataFrameDst.except(joinedCompressedDst)
 
-    (resultDataFrameSrc, resultDataFrameDst)
-
+    (resultDataFrameSrc.repartition(DataFrameUtility.numPartitions), resultDataFrameDst.repartition(DataFrameUtility.numPartitions))
   }
 
   def makeDimDF(mainDF: DataFrame, transDF: DataFrame, sparkSession: SparkSession) = {
     import sparkSession.implicits._
 
+    //crea una Map[String, Tuple(String, Int)] con: chiave = id della pagina italiana; valore = (id_redirect, dim)
+    //se la pagina non italiana non ha redirect, allora dentro id_redirect salva l'id della pagina.
+    //La dimensione è quella della pagina italiana e non della redirect.
     val mappa = transDF.map(row =>
-      (row.getString(0), row.getString(5))
-    ).collect().toMap.withDefaultValue("")
+      (row.getString(0), Tuple2(if(!row.getString(5).isEmpty) row.getString(5) else row.getString(0), row.getInt(4)))
+    ).collect().toMap.withDefaultValue(Tuple2("",0))
 
-    val mappa2 = transDF.map(row => (row.getString(5), row.getInt(4))).collect().toMap.withDefaultValue(0)
+    //Per ogni pagina italiana che è redirect, cambia il valore dim con la dim della pagina puntata
+    val mappa2 = mappa.keys.map(id => {
+      val (originalID, dim) = mappa(id)
+      if(originalID==id) {(id,Tuple2(originalID, dim))} else {(id,Tuple2(originalID, mappa(originalID)._2))}
+    }).toMap.withDefaultValue(Tuple2("",0))
 
     val res = mainDF.map(row => {
-      (row.getString(0), row.getInt(1), row.getString(2), row.getAs[mutable.WrappedArray[Int]](3), row.getAs[mutable.WrappedArray[Int]](4), row.getInt(5), row.getAs[mutable.WrappedArray[String]](6), mappa(row.getString(2)), mappa2(mappa(row.getString(2))))
-    }).toDF("id", "num_traduzioni", "id_pagina_tradotta", "num_visualiz_anno", "num_visualiz_mesi", "byte_dim_page", "id_redirect", "id_ita", "byte_dim_page_ita_original")
+      val (redirectID, dimRedirect) = mappa2(row.getString(2))
+      (row.getString(0), row.getString(2), row.getInt(5), row.getAs[mutable.WrappedArray[String]](6), redirectID, dimRedirect)
+    }).toDF("id", "id_pagina_tradotta",  "byte_dim_page", "id_traduzioni_redirect", "id_ita", "byte_dim_page_ita_original")
 
     val sumDF = res.groupBy("id_ita")
       .sum("byte_dim_page")
       .withColumnRenamed("sum(byte_dim_page)","byte_dim_page_tot")
       .withColumnRenamed("id_ita", "id_ita2")
+      .repartition(DataFrameUtility.numPartitions)
 
-    val dimsDF = res.join(sumDF, res("id_ita")=== sumDF("id_ita2"))
-      .drop("num_traduzioni")
-      .drop("num_visualiz_anno")
-      .drop("num_visualiz_mesi")
-      .drop("id_ita2")
-
-    dimsDF
+    res.join(sumDF, res("id_ita") === sumDF("id_ita2")).drop("id_ita2")
   }
 }
