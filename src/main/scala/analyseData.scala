@@ -63,24 +63,24 @@ object analyseData extends App {
 
     //dataframe con score
     var scoreDF = minMaxSrc.withColumn("score",score_(maxSrc)($"sum")).sort(desc("score"))
-    //scoreDF.show(20, false)
+    scoreDF.show(20, false)
 
     var scoreDFDst = minMaxDst.withColumn("score",score_(maxDst)($"sum")).sort(desc("score"))
-    //scoreDFDst.show(20, false)
+    scoreDFDst.show(20, false)
 
 
     // Crescita/decrescita per anni/mesi
-    def grow[T](implicit num: Numeric[T]) = udf((score: Double, xs: WA[T]) => {
-      import num._
-      val tmp : T = 1.asInstanceOf[T]
-      val delta1 = (xs(1) - xs(0)).toDouble /max(xs(0),tmp)
-      val delta2 = (xs(2) - xs(1)).toDouble /max(xs(0),tmp)
+
+
+    val growingYearBonusesEn_ = udf((score: Double, xs: WA[Long]) => {
+      val delta1 = (xs(1) - xs(0)).toDouble /math.max(xs(0),1)
+      val delta2 = (xs(2) - xs(1)).toDouble /math.max(xs(0),1)
+
+
       //tarare le costanti
       (tanh(delta1)*6)+(tanh(delta2)*6)+score
-
     })
-    /*
-    val growingYearBonuses_ = udf((score: Double, xs: WA[Long]) => {
+    val growingYearBonusesIta_ = udf((score: Double, xs: WA[Int]) => {
       val delta1 = (xs(1) - xs(0)).toDouble /math.max(xs(0),1)
       val delta2 = (xs(2) - xs(1)).toDouble /math.max(xs(0),1)
 
@@ -89,17 +89,17 @@ object analyseData extends App {
       (tanh(delta1)*6)+(tanh(delta2)*6)+score
     })
 
-     */
 
-    scoreDF = scoreDF.withColumn("score",grow[Long]($"score", $"num_visualiz_anno")).sort(desc("score"))
-    scoreDF.show(20, false)
 
-    scoreDFDst = scoreDFDst.withColumn("score",grow[Int]($"score", $"num_visualiz_anno")).sort(desc("score"))
-    scoreDFDst.show(20, false)
+    scoreDF = scoreDF.withColumn("score",growingYearBonusesEn_($"score", $"num_visualiz_anno")).sort(desc("score"))
+    //scoreDF.show(20, false)
 
-    /*
+    scoreDFDst = scoreDFDst.withColumn("score",growingYearBonusesIta_($"score", $"num_visualiz_anno")).sort(desc("score"))
+    //scoreDFDst.show(20, false)
 
-    val growingMonthBonuses_ = udf((score: Double, xs: WA[Long]) => {
+
+
+    val growingMonthBonusesEn_ = udf((score: Double, xs: WA[Long]) => {
       val delta = (0 to 2).map( i => {
         xs(i*4)+xs(i*4+1)+xs(i*4+2)+xs(i*4+3)
       })
@@ -109,14 +109,49 @@ object analyseData extends App {
       (tanh(delta1)*2)+(tanh(delta2)*2)+score
     })
 
-    scoreDF = scoreDF.withColumn("score",growingMonthBonuses_($"score", $"num_visualiz_mesi")).sort(desc("score"))
-    scoreDF.show(20, false)
+    val growingMonthBonusesIta_ = udf((score: Double, xs: WA[Int]) => {
+      val delta = (0 to 2).map( i => {
+        xs(i*4)+xs(i*4+1)+xs(i*4+2)+xs(i*4+3)
+      })
+      val delta1 = (delta(1) - delta(0)).toDouble /math.max(delta(0),1)
+      val delta2 = (delta(2) - delta(1)).toDouble /math.max(delta(0),1)
+      //tarare le costanti
+      (tanh(delta1)*2)+(tanh(delta2)*2)+score
+    })
 
-    //it
+    scoreDF = scoreDF.withColumn("score",growingMonthBonusesEn_($"score", $"num_visualiz_mesi")).sort(desc("score"))
+    //scoreDF.show(20, false)
+
+    scoreDFDst = scoreDFDst.withColumn("score",growingMonthBonusesIta_($"score", $"num_visualiz_mesi")).sort(desc("score"))
+    //scoreDFDst.show(20, false)
+
+    val maxScoreSrc = scoreDF.first().getAs[Double](8)
+    val maxScoreDst = scoreDFDst.first().getAs[Double](7)
+    val maxScore = maxScoreSrc + maxScoreDst
+
+    scoreDFDst = scoreDFDst.withColumnRenamed("score","scoreIta").drop("id")
+    scoreDF = scoreDF.join(scoreDFDst.select("id_pagina_originale","scoreIta"), scoreDF("id") === scoreDFDst("id_pagina_originale"),"left_outer").sort(desc("score"))
+    //scoreDF.show(20, false)
+
+    //riuniune score su tabella inglese
+
+
+
+    val sumMean_ = udf((score: Double, scoreIta:Double) => {
+      if (scoreIta < -100) 100*(score+(0.5*scoreIta))/maxScore
+      else score
+    })
+
+    scoreDF = scoreDF.withColumn("score", sumMean_($"score", $"scoreIta")).sort(desc("score"))
+    scoreDF = scoreDF.drop("sum","scoreIta","id_pagina_tradotta")
+    //scoreDF.show(20, false)
+
+
+    //dimensioni
 
 
     dataFrameSize = dataFrameSize.join(scoreDF.select("id","score"),Seq("id")).sort(desc("score"))
-
+    dataFrameSize.filter("id == '123Movies'").show(2, false)
 
     // bonus pagina senza traduzione linkate correttamente
 
@@ -125,13 +160,15 @@ object analyseData extends App {
 
       var byteEn = 0
       var byteIt = 0
+      var bonus = 0
       if(idIta.isEmpty) byteEn = singleEn
+
       else byteEn = sumEn
 
       byteIt = singleIt + redirectDim
+      if (singleIt == 0) bonus = 1000
 
-
-      score + 20.0 * ((byteEn - byteIt).toDouble/ math.max(byteEn, byteIt))
+      score + bonus + 20.0 * ((byteEn - byteIt).toDouble/ math.max(byteEn, byteIt))
 
     })
 
@@ -143,6 +180,7 @@ object analyseData extends App {
 
     // riporto lo score
     scoreDF = scoreDF.drop("score").join(dataFrameSize.select("id", "score"), Seq("id")).sort(desc("score"))
+    scoreDF.show(20,false)
 
 
 
@@ -154,7 +192,9 @@ object analyseData extends App {
 
 
 
-     */
+
+
+
 
 
     val endTime = System.currentTimeMillis()
