@@ -43,7 +43,9 @@ package Utilities {
 
         val folder = new File(queue.dequeue())
 
-        if(folder.toString.takeRight(2) == subFolder) {
+
+
+        if(folder.toString.takeRight(subFolder.length) == subFolder) {
 
           val files = folder.listFiles.filter(file => file.isFile && (file.toString.takeRight(15) == ".snappy.parquet")).map(file => file.toString)
 
@@ -274,8 +276,6 @@ package Utilities {
       val noErrorDataFrameDst = dataFrameDst.except(joinedDataFrameDst).repartition(numPartitions)
 
       val resultDst = noErrorDataFrameDst.union(tempDataFrameDst)
-
-
 
       resultDst.repartition(numPartitions).write.parquet(outputFolderName + folderSeparator + "it")
 
