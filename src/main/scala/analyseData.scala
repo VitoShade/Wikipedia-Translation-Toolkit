@@ -5,6 +5,8 @@ import org.apache.spark.sql.types.IntegerType
 
 import scala.collection.mutable.{WrappedArray => WA}
 import org.apache.spark.sql.functions.udf
+
+import scala.collection.mutable
 import scala.math._
 
 object analyseData extends App {
@@ -63,66 +65,55 @@ object analyseData extends App {
 
     //dataframe con score
     var scoreDF = minMaxSrc.withColumn("score",score_(maxSrc)($"sum")).sort(desc("score"))
-    scoreDF.show(20, false)
+    //scoreDF.show(20, false)
 
     var scoreDFDst = minMaxDst.withColumn("score",score_(maxDst)($"sum")).sort(desc("score"))
-    scoreDFDst.show(20, false)
+    //scoreDFDst.show(20, false)
 
 
     // Crescita/decrescita per anni/mesi
 
+    def growingYearBonuses_ = udf((score: Double, xs: WA[AnyVal]) => {
 
-    val growingYearBonusesEn_ = udf((score: Double, xs: WA[Long]) => {
-      val delta1 = (xs(1) - xs(0)).toDouble /math.max(xs(0),1)
-      val delta2 = (xs(2) - xs(1)).toDouble /math.max(xs(0),1)
+      val years = xs.map(xi => {xi.asInstanceOf[Number].longValue()})
 
-
-      //tarare le costanti
-      (tanh(delta1)*6)+(tanh(delta2)*6)+score
-    })
-    val growingYearBonusesIta_ = udf((score: Double, xs: WA[Int]) => {
-      val delta1 = (xs(1) - xs(0)).toDouble /math.max(xs(0),1)
-      val delta2 = (xs(2) - xs(1)).toDouble /math.max(xs(0),1)
-
-
+      val delta1 = (years(1) - years(0)).toDouble / math.max(years(0),1)
+      val delta2 = (years(2) - years(1)).toDouble / math.max(years(0),1)
       //tarare le costanti
       (tanh(delta1)*6)+(tanh(delta2)*6)+score
     })
 
 
 
-    scoreDF = scoreDF.withColumn("score",growingYearBonusesEn_($"score", $"num_visualiz_anno")).sort(desc("score"))
+
+    scoreDF = scoreDF.withColumn("score",growingYearBonuses_($"score", $"num_visualiz_anno")).sort(desc("score"))
     //scoreDF.show(20, false)
 
-    scoreDFDst = scoreDFDst.withColumn("score",growingYearBonusesIta_($"score", $"num_visualiz_anno")).sort(desc("score"))
+    scoreDFDst = scoreDFDst.withColumn("score",growingYearBonuses_($"score", $"num_visualiz_anno")).sort(desc("score"))
     //scoreDFDst.show(20, false)
 
 
+    def growingMonthBonuses_ = udf((score: Double, xs: WA[AnyVal]) => {
 
-    val growingMonthBonusesEn_ = udf((score: Double, xs: WA[Long]) => {
+      val months = xs.map(xi => {xi.asInstanceOf[Number].longValue()})
+
       val delta = (0 to 2).map( i => {
-        xs(i*4)+xs(i*4+1)+xs(i*4+2)+xs(i*4+3)
+        months(i*4)+months(i*4+1)+months(i*4+2)+months(i*4+3)
       })
-      val delta1 = (delta(1) - delta(0)).toDouble /math.max(delta(0),1)
-      val delta2 = (delta(2) - delta(1)).toDouble /math.max(delta(0),1)
+
+      val delta1 = (delta(1) - delta(0)).toDouble / math.max(delta(0),1)
+      val delta2 = (delta(2) - delta(1)).toDouble / math.max(delta(0),1)
       //tarare le costanti
       (tanh(delta1)*2)+(tanh(delta2)*2)+score
     })
 
-    val growingMonthBonusesIta_ = udf((score: Double, xs: WA[Int]) => {
-      val delta = (0 to 2).map( i => {
-        xs(i*4)+xs(i*4+1)+xs(i*4+2)+xs(i*4+3)
-      })
-      val delta1 = (delta(1) - delta(0)).toDouble /math.max(delta(0),1)
-      val delta2 = (delta(2) - delta(1)).toDouble /math.max(delta(0),1)
-      //tarare le costanti
-      (tanh(delta1)*2)+(tanh(delta2)*2)+score
-    })
 
-    scoreDF = scoreDF.withColumn("score",growingMonthBonusesEn_($"score", $"num_visualiz_mesi")).sort(desc("score"))
+
+
+    scoreDF = scoreDF.withColumn("score",growingMonthBonuses_($"score", $"num_visualiz_mesi")).sort(desc("score"))
     //scoreDF.show(20, false)
 
-    scoreDFDst = scoreDFDst.withColumn("score",growingMonthBonusesIta_($"score", $"num_visualiz_mesi")).sort(desc("score"))
+    scoreDFDst = scoreDFDst.withColumn("score",growingMonthBonuses_($"score", $"num_visualiz_mesi")).sort(desc("score"))
     //scoreDFDst.show(20, false)
 
     val maxScoreSrc = scoreDF.first().getAs[Double](8)
@@ -130,51 +121,60 @@ object analyseData extends App {
     val maxScore = maxScoreSrc + maxScoreDst
 
     scoreDFDst = scoreDFDst.withColumnRenamed("score","scoreIta").drop("id")
-    scoreDF = scoreDF.join(scoreDFDst.select("id_pagina_originale","scoreIta"), scoreDF("id") === scoreDFDst("id_pagina_originale"),"left_outer").sort(desc("score"))
+    scoreDF = scoreDF.join(scoreDFDst.select("id_pagina_originale","scoreIta"), scoreDF("id") === scoreDFDst("id_pagina_originale"),"left_outer")
+      .na.fill("", Seq("id_pagina_originale"))
+      .na.fill(0, Seq("scoreIta"))
+      .sort(desc("score"))
+
     //scoreDF.show(20, false)
+
 
     //riuniune score su tabella inglese
 
 
 
-    val sumMean_ = udf((score: Double, scoreIta:Double) => {
-      if (scoreIta < -100) 100*(score+(0.5*scoreIta))/maxScore
-      else score
+    val sumMean_ = udf((score: Double, idIta : String, scoreIta:Double) => {
+      if (idIta.isEmpty) score
+      else 100*(score+(0.5*scoreIta)) / maxScore
     })
 
-    scoreDF = scoreDF.withColumn("score", sumMean_($"score", $"scoreIta")).sort(desc("score"))
+    scoreDF = scoreDF.withColumn("score", sumMean_($"score", $"id_pagina_tradotta", $"scoreIta")).sort(desc("score"))
     scoreDF = scoreDF.drop("sum","scoreIta","id_pagina_tradotta")
     //scoreDF.show(20, false)
 
 
     //dimensioni
-
+    //scoreDF.filter("id == '123Movies'").show(2, false)
 
     dataFrameSize = dataFrameSize.join(scoreDF.select("id","score"),Seq("id")).sort(desc("score"))
-    dataFrameSize.filter("id == '123Movies'").show(2, false)
+    //dataFrameSize.filter("id == '123Movies'").show(2, false)
 
     // bonus pagina senza traduzione linkate correttamente
 
+    //dataFrameSize.filter("id_ita == ''").show(false)
+
 
     val translateBonus_ = udf((score: Double, idIta: String, singleEn: Int, sumEn: Int, singleIt:Int, redirectDim:Int ) => {
-
       var byteEn = 0
       var byteIt = 0
-      var bonus = 0
-      if(idIta.isEmpty) byteEn = singleEn
+      var bonus = 0.0
 
-      else byteEn = sumEn
+      if(idIta.isEmpty)
+        byteEn = singleEn
+      else
+        byteEn = sumEn
 
       byteIt = singleIt + redirectDim
-      if (singleIt == 0) bonus = 1000
 
-      score + bonus + 20.0 * ((byteEn - byteIt).toDouble/ math.max(byteEn, byteIt))
+      if (idIta.isEmpty) bonus = 10.0
 
+      score + bonus + 20.0 * ((byteEn - byteIt).toDouble / math.max(byteEn, byteIt))
     })
 
     //Aggiungiamo le pagine con link rotti
 
-    dataFrameSize = dataFrameSize.withColumn("score",translateBonus_($"score", $"id_ita", $"byte_dim_page", $"byte_dim_page_tot", $"byte_dim_page_ita_original", $"id_traduzioni_redirect_dim")).sort(desc("score"))
+    println("translateBonus_")
+    dataFrameSize = dataFrameSize.withColumn("score", translateBonus_($"score", $"id_ita", $"byte_dim_page", $"byte_dim_page_tot", $"byte_dim_page_ita_original", $"id_traduzioni_redirect_dim")).sort(desc("score"))
     //dataFrameSize.show(20, false)
 
 
@@ -189,11 +189,6 @@ object analyseData extends App {
 
     //somma di tutte le pagine italiane raggiungibili da una pagina inglese
     //scoreDF = scoreDF.withColumn("score",growingMonthBonuses_($"score", $"num_visualiz_mesi")).sort(desc("score"))
-
-
-
-
-
 
 
 
