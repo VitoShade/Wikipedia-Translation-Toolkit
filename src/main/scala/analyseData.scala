@@ -157,19 +157,24 @@ object analyseData extends App {
     val maxScore = maxScoreSrc + maxScoreDst
 
     scoreDFDst = scoreDFDst.withColumnRenamed("score","scoreIta").drop("id")
-    scoreDF = scoreDF.join(scoreDFDst.select("id_pagina_originale","scoreIta"), scoreDF("id") === scoreDFDst("id_pagina_originale"),"left_outer").sort(desc("score"))
+    scoreDF = scoreDF.join(scoreDFDst.select("id_pagina_originale","scoreIta"), scoreDF("id") === scoreDFDst("id_pagina_originale"),"left_outer")
+      .na.fill("", Seq("id_pagina_originale"))
+      .na.fill(0, Seq("scoreIta"))
+      .sort(desc("score"))
+
     //scoreDF.show(20, false)
+
 
     //riuniune score su tabella inglese
 
 
 
-    val sumMean_ = udf((score: Double, scoreIta:Double) => {
-      if (scoreIta < -100) 100*(score+(0.5*scoreIta))/maxScore
-      else score
+    val sumMean_ = udf((score: Double, idIta : String, scoreIta:Double) => {
+      if (idIta.isEmpty) score
+      else 100*(score+(0.5*scoreIta)) / maxScore
     })
 
-    scoreDF = scoreDF.withColumn("score", sumMean_($"score", $"scoreIta")).sort(desc("score"))
+    scoreDF = scoreDF.withColumn("score", sumMean_($"score", $"id_pagina_tradotta", $"scoreIta")).sort(desc("score"))
     scoreDF = scoreDF.drop("sum","scoreIta","id_pagina_tradotta")
     //scoreDF.show(20, false)
 
@@ -178,27 +183,29 @@ object analyseData extends App {
 
 
     dataFrameSize = dataFrameSize.join(scoreDF.select("id","score"),Seq("id")).sort(desc("score"))
-    dataFrameSize.filter("id == '123Movies'").show(2, false)
+    //dataFrameSize.filter("id == '123Movies'").show(2, false)
 
     // bonus pagina senza traduzione linkate correttamente
 
+    dataFrameSize.filter("id_ita == ''").show(false)
+
 
     val translateBonus_ = udf((score: Double, idIta: String, singleEn: Int, sumEn: Int, singleIt:Int, redirectDim:Int ) => {
-
       var byteEn = 0
       var byteIt = 0
       var bonus = 0
-      if(idIta.isEmpty) byteEn = singleEn
 
-      else byteEn = sumEn
+      if(idIta.isEmpty)
+        byteEn = singleEn
+      else
+        byteEn = sumEn
 
       byteIt = singleIt + redirectDim
 
       if (idIta.isEmpty)
-        bonus = 1000
-
+        1000
+      else
         score + bonus + 20.0 * ((byteEn - byteIt).toDouble / math.max(byteEn, byteIt))
-
     })
 
     //Aggiungiamo le pagine con link rotti
