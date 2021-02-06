@@ -7,6 +7,7 @@
 [debug] 	analyseData.class
 [debug] 	analyseData$$typecreator1$1.class
 [debug] 	analyseData$$typecreator2$1.class
+[debug] 	analyseData$$typecreator4$1.class
 [debug] We backup class files:
 [debug] 	analyseData$$typecreator1$2.class
 [debug] 	analyseData$$typecreator1$3.class
@@ -15,6 +16,7 @@
 [debug] 	analyseData.class
 [debug] 	analyseData$$typecreator1$1.class
 [debug] 	analyseData$$typecreator2$1.class
+[debug] 	analyseData$$typecreator4$1.class
 [debug] Registering generated classes:
 [debug] 	analyseData$$typecreator1$2.class
 [debug] 	analyseData$$typecreator1$3.class
@@ -23,4 +25,5 @@
 [debug] 	analyseData.class
 [debug] 	analyseData$$typecreator1$1.class
 [debug] 	analyseData$$typecreator2$1.class
+[debug] 	analyseData$$typecreator4$1.class
 [debug] Removing the temporary directory used for backing up class files: C:\Users\nik_9\IdeaProjects\Wikipedia-Translation-Toolkit\target\scala-2.12\classes.bak

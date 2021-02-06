@@ -11,7 +11,7 @@ import scala.collection.mutable.{WrappedArray => WA}
 
 
 object prepareData extends App {
-  override def main(args: Array[String]) {
+  def mainX(args: Array[String]) {
 
     val sparkSession = SparkSession.builder().master("local[8]").appName("prepareData").getOrCreate()
     val sparkContext = sparkSession.sparkContext

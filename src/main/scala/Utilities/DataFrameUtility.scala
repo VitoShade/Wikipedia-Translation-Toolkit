@@ -14,6 +14,11 @@ package Utilities {
 
     val numPartitions = 8
 
+    def readParquetFromFoldersAndShow(folders: Array[String]): Array[String] = {
+      //collectParquetFilesFromFolders(folders)
+      Array()
+    }
+
     def collectParquetFilesFromFolders(folders: Array[String]): Array[String] = {
 
       var allParquetFiles = Array[String]()
@@ -55,12 +60,10 @@ package Utilities {
         queue ++= recursiveFolders
       }
 
-      val dataFrameFilesSrc = allParquetFiles map (tempFile => sparkSession.read.parquet(tempFile))
+      val dataFrameFiles = allParquetFiles map (tempFile => sparkSession.read.parquet(tempFile))
 
       //merge dei parquet in un dataFrame unico
-      val dataFrameSrc = dataFrameFilesSrc.reduce(_ union _)
-
-      dataFrameSrc
+      dataFrameFiles.reduce(_ union _)
     }
 
     def DEBUG_redirectDiRedirect(dataFrameSrc: DataFrame) {

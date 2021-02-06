@@ -1,19 +1,15 @@
 import Utilities._
 import org.apache.spark.sql.SparkSession
-import org.apache.spark.sql.functions.{col, desc, lit}
-import org.apache.spark.sql.types.IntegerType
-
+import org.apache.spark.sql.functions.desc
 import scala.collection.mutable.{WrappedArray => WA}
 import org.apache.spark.sql.functions.udf
-
-import scala.collection.mutable
 import scala.math._
 
 object analyseData extends App {
-
   override def main(args: Array[String]) {
 
-    val sparkSession = SparkSession.builder().master("local[4]").appName("analyseData").getOrCreate()
+    //val sparkSession = SparkSession.builder().master("local[4]").appName("analyseData").getOrCreate()
+    val sparkSession = SparkSession.builder().appName("analyseData").getOrCreate()
     val sparkContext = sparkSession.sparkContext
 
     sparkContext.setLogLevel("WARN")
@@ -21,10 +17,12 @@ object analyseData extends App {
     //per convertire RDD in DataFrame
     import sparkSession.implicits._
 
-    val inputFolderName = "C:\\Users\\nik_9\\Desktop\\prova\\datiFinali"
-    val errorFolderName  = "C:\\Users\\nik_9\\Desktop\\prova\\datiFinali\\error"
-    val sizeFolderName   = "C:\\Users\\nik_9\\Desktop\\prova\\datiFinali\\size"
-    val folderSeparator = "\\"
+    //val inputFolderName = "C:\\Users\\nik_9\\Desktop\\prova\\datiFinali"
+    //val outputFolderName  = "C:\\Users\\nik_9\\Desktop\\prova\\risultato"
+    //val folderSeparator = "\\"
+    val inputFolderName   = "s3n://wtt-s3-1/datiFinali"
+    val outputFolderName  = "s3n://wtt-s3-1/risultato"
+    val folderSeparator   = "/"
 
     //dataFrame dai parquet inglesi
     val dataFrameSrc = DataFrameUtility.dataFrameFromFoldersRecursively(Array(inputFolderName), "en", sparkSession)
@@ -39,7 +37,7 @@ object analyseData extends App {
 
 
 
-    //DF standard
+    // DF standard
     //"id", "num_traduzioni", "id_pagina_tradotta", "num_visualiz_anno", "num_visualiz_mesi", "byte_dim_page", "id_traduzioni_redirect"
 
     // DF italiano
@@ -85,30 +83,15 @@ object analyseData extends App {
       //tarare le costanti
       (tanh(delta1)*6)+(tanh(delta2)*6)+score
     })
-    /*val growingYearBonusesEn_ = udf((score: Double, xs: WA[Long]) => {
-      val delta1 = (xs(1) - xs(0)).toDouble /math.max(xs(0),1)
-      val delta2 = (xs(2) - xs(1)).toDouble /math.max(xs(0),1)
 
-
-      //tarare le costanti
-      (tanh(delta1)*6)+(tanh(delta2)*6)+score
-    })
-    val growingYearBonusesIta_ = udf((score: Double, xs: WA[Int]) => {
-      val delta1 = (xs(1) - xs(0)).toDouble /math.max(xs(0),1)
-      val delta2 = (xs(2) - xs(1)).toDouble /math.max(xs(0),1)
-
-
-      //tarare le costanti
-      (tanh(delta1)*6)+(tanh(delta2)*6)+score
-    })*/
 
 
 
     scoreDF = scoreDF.withColumn("score",growingYearBonuses_($"score", $"num_visualiz_anno")).sort(desc("score"))
-    //scoreDF.show(20, false)
+    scoreDF.show(20, false)
 
     scoreDFDst = scoreDFDst.withColumn("score",growingYearBonuses_($"score", $"num_visualiz_anno")).sort(desc("score"))
-    //scoreDFDst.show(20, false)
+    scoreDFDst.show(20, false)
 
 
     def growingMonthBonuses_ = udf((score: Double, xs: WA[AnyVal]) => {
@@ -126,31 +109,13 @@ object analyseData extends App {
     })
 
 
-    /*val growingMonthBonusesEn_ = udf((score: Double, xs: WA[Long]) => {
-      val delta = (0 to 2).map( i => {
-        xs(i*4)+xs(i*4+1)+xs(i*4+2)+xs(i*4+3)
-      })
-      val delta1 = (delta(1) - delta(0)).toDouble /math.max(delta(0),1)
-      val delta2 = (delta(2) - delta(1)).toDouble /math.max(delta(0),1)
-      //tarare le costanti
-      (tanh(delta1)*2)+(tanh(delta2)*2)+score
-    })
 
-    val growingMonthBonusesIta_ = udf((score: Double, xs: WA[Int]) => {
-      val delta = (0 to 2).map( i => {
-        xs(i*4)+xs(i*4+1)+xs(i*4+2)+xs(i*4+3)
-      })
-      val delta1 = (delta(1) - delta(0)).toDouble /math.max(delta(0),1)
-      val delta2 = (delta(2) - delta(1)).toDouble /math.max(delta(0),1)
-      //tarare le costanti
-      (tanh(delta1)*2)+(tanh(delta2)*2)+score
-    })*/
 
     scoreDF = scoreDF.withColumn("score",growingMonthBonuses_($"score", $"num_visualiz_mesi")).sort(desc("score"))
-    //scoreDF.show(20, false)
+    scoreDF.show(20, false)
 
     scoreDFDst = scoreDFDst.withColumn("score",growingMonthBonuses_($"score", $"num_visualiz_mesi")).sort(desc("score"))
-    //scoreDFDst.show(20, false)
+    scoreDFDst.show(20, false)
 
     val maxScoreSrc = scoreDF.first().getAs[Double](8)
     val maxScoreDst = scoreDFDst.first().getAs[Double](7)
@@ -162,7 +127,7 @@ object analyseData extends App {
       .na.fill(0, Seq("scoreIta"))
       .sort(desc("score"))
 
-    //scoreDF.show(20, false)
+    scoreDF.show(20, false)
 
 
     //riuniune score su tabella inglese
@@ -176,24 +141,24 @@ object analyseData extends App {
 
     scoreDF = scoreDF.withColumn("score", sumMean_($"score", $"id_pagina_tradotta", $"scoreIta")).sort(desc("score"))
     scoreDF = scoreDF.drop("sum","scoreIta","id_pagina_tradotta")
-    //scoreDF.show(20, false)
+    scoreDF.show(20, false)
 
 
     //dimensioni
-
+    //scoreDF.filter("id == '123Movies'").show(2, false)
 
     dataFrameSize = dataFrameSize.join(scoreDF.select("id","score"),Seq("id")).sort(desc("score"))
     //dataFrameSize.filter("id == '123Movies'").show(2, false)
 
     // bonus pagina senza traduzione linkate correttamente
 
-    dataFrameSize.filter("id_ita == ''").show(false)
+    //dataFrameSize.filter("id_ita == ''").show(false)
 
 
     val translateBonus_ = udf((score: Double, idIta: String, singleEn: Int, sumEn: Int, singleIt:Int, redirectDim:Int ) => {
       var byteEn = 0
       var byteIt = 0
-      var bonus = 0
+      var bonus = 0.0
 
       if(idIta.isEmpty)
         byteEn = singleEn
@@ -202,15 +167,13 @@ object analyseData extends App {
 
       byteIt = singleIt + redirectDim
 
-      if (idIta.isEmpty)
-        1000
-      else
-        score + bonus + 20.0 * ((byteEn - byteIt).toDouble / math.max(byteEn, byteIt))
+      if (idIta.isEmpty) bonus = 10.0
+
+      score + bonus + 20.0 * ((byteEn - byteIt).toDouble / math.max(byteEn, byteIt))
     })
 
     //Aggiungiamo le pagine con link rotti
 
-    println("translateBonus_")
     dataFrameSize = dataFrameSize.withColumn("score", translateBonus_($"score", $"id_ita", $"byte_dim_page", $"byte_dim_page_tot", $"byte_dim_page_ita_original", $"id_traduzioni_redirect_dim")).sort(desc("score"))
     dataFrameSize.show(20, false)
 
@@ -219,7 +182,7 @@ object analyseData extends App {
     scoreDF = scoreDF.drop("score").join(dataFrameSize.select("id", "score"), Seq("id")).sort(desc("score"))
     scoreDF.show(20,false)
 
-
+    scoreDF.write.parquet(outputFolderName)
 
 
 
