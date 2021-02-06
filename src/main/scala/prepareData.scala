@@ -5,13 +5,14 @@ import API.{APILangLinks, APIPageView, APIRedirect}
 import org.apache.spark.sql.{DataFrame, SparkSession}
 import Utilities._
 import org.apache.commons.io.FileUtils
-import org.apache.spark.sql.functions.{col, collect_set, desc, sum, udf, when}
+import org.apache.spark.sql.functions.{col, collect_set, sum, udf, when}
+
 import scala.collection.mutable
 import scala.collection.mutable.{WrappedArray => WA}
 
 
 object prepareData extends App {
-  override def main(args: Array[String]) {
+  def mainX(args: Array[String]) {
 
     val sparkSession = SparkSession.builder().master("local[16]").appName("prepareData").getOrCreate()
     val sparkContext = sparkSession.sparkContext
@@ -23,7 +24,6 @@ object prepareData extends App {
 
     val inputFolderName  = "/Users/stefano/IdeaProjects/Wikipedia-Translation-Toolkit/src/main/files/outputProcessati"
     val tempFolderName   = "/Users/stefano/IdeaProjects/Wikipedia-Translation-Toolkit/src/main/files/tempOutput"
-    //val tempFolderName = "/Users/stefano/IdeaProjects/Wikipedia-Translation-Toolkit/src/main/files/outputProcessati"
 
     val outputFolderName = "/Users/stefano/IdeaProjects/Wikipedia-Translation-Toolkit/src/main/files/datiFinali"
     val errorFolderName  = "/Users/stefano/IdeaProjects/Wikipedia-Translation-Toolkit/src/main/files/tempOutput/error"
@@ -45,13 +45,13 @@ object prepareData extends App {
     val dataFrameSrc = DataFrameUtility.dataFrameFromFoldersRecursively(Array(tempFolderName), "en", sparkSession)
 
     // Compressione dataframe da tradurre (togliendo redirect)
-    val compressedSrc = compressRedirect(dataFrameSrc, sparkSession).repartition(16)
+    val compressedSrc = compressRedirect(dataFrameSrc, sparkSession).repartition(DataFrameUtility.numPartitions)
 
     // DataFrame dai parquet italiani
-    var dataFrameDst = DataFrameUtility.dataFrameFromFoldersRecursively(Array(tempFolderName), "it", sparkSession).dropDuplicates().repartition(16)
+    var dataFrameDst = DataFrameUtility.dataFrameFromFoldersRecursively(Array(tempFolderName), "it", sparkSession).dropDuplicates().repartition(DataFrameUtility.numPartitions)
 
     // Chiamata per scaricare pagine italiane che si ottengono tramite redirect
-    dataFrameDst = missingIDsDF(dataFrameDst, errorFolderName, folderSeparator, sparkSession).dropDuplicates().repartition(16)
+    dataFrameDst = missingIDsDF(dataFrameDst, errorFolderName, folderSeparator, sparkSession).dropDuplicates().repartition(DataFrameUtility.numPartitions)
 
     // Cancellazione pagine con errori
     val (resultDataFrameSrc, resultDataFrameDst) = removeErrorPages(compressedSrc, dataFrameDst, sparkSession, tempFolderName)
@@ -62,11 +62,11 @@ object prepareData extends App {
     // Pulizia directory
     FileUtils.deleteDirectory(new File(outputFolderName + folderSeparator + "en"))
     FileUtils.deleteDirectory(new File(outputFolderName + folderSeparator + "it"))
-    //FileUtils.deleteDirectory(new File(sizeFolderName))
+    FileUtils.deleteDirectory(new File(sizeFolderName))
 
-    //resultDataFrameSrc.write.parquet(outputFolderName + folderSeparator + "en")
-    //resultDataFrameDst.write.parquet(outputFolderName + folderSeparator + "it")
-    //dimPageDF.write.parquet(sizeFolderName)
+    resultDataFrameSrc.write.parquet(outputFolderName + folderSeparator + "en")
+    resultDataFrameDst.write.parquet(outputFolderName + folderSeparator + "it")
+    dimPageDF.repartition(DataFrameUtility.numPartitions).write.parquet(sizeFolderName)
 
     //Controllo se è corretto
     val removeEmpty = udf((array: Seq[String]) => !array.isEmpty)
@@ -194,7 +194,7 @@ object prepareData extends App {
     //rimozione dalle pagine compresse di quelle con errori
     val resultDataFrameDst = dataFrameDst.except(joinedCompressedDst)
 
-    (resultDataFrameSrc.repartition(16), resultDataFrameDst.repartition(16))
+    (resultDataFrameSrc.repartition(DataFrameUtility.numPartitions), resultDataFrameDst.repartition(DataFrameUtility.numPartitions))
   }
 
   def makeDimDF(mainDF: DataFrame, transDF: DataFrame, sparkSession: SparkSession) = {
@@ -215,14 +215,15 @@ object prepareData extends App {
 
     val res = mainDF.map(row => {
       val (redirectID, dimRedirect) = mappa2(row.getString(2))
-      (row.getString(0), row.getString(2), row.getInt(5), row.getAs[mutable.WrappedArray[String]](6), redirectID, dimRedirect)
-    }).toDF("id", "id_pagina_tradotta",  "byte_dim_page", "id_traduzioni_redirect", "id_ita", "byte_dim_page_ita_original")
+      val arr = row.getAs[mutable.WrappedArray[String]](6).map(redirectID => mappa2(redirectID)._1)
+      (row.getString(0), row.getInt(5), arr, redirectID, dimRedirect, arr.map(redirectID => mappa2(redirectID)._2).sum)
+    }).toDF("id",  "byte_dim_page", "id_traduzioni_redirect", "id_ita", "byte_dim_page_ita_original", "id_traduzioni_redirect_dim")
 
     val sumDF = res.groupBy("id_ita")
       .sum("byte_dim_page")
       .withColumnRenamed("sum(byte_dim_page)","byte_dim_page_tot")
       .withColumnRenamed("id_ita", "id_ita2")
-      .repartition(16)
+      .repartition(DataFrameUtility.numPartitions)
 
     res.join(sumDF, res("id_ita") === sumDF("id_ita2")).drop("id_ita2")
   }
