@@ -65,10 +65,10 @@ object analyseData extends App {
 
     //dataframe con score
     var scoreDF = minMaxSrc.withColumn("score",score_(maxSrc)($"sum")).sort(desc("score"))
-    //scoreDF.show(20, false)
+    scoreDF.show(20, false)
 
     var scoreDFDst = minMaxDst.withColumn("score",score_(maxDst)($"sum")).sort(desc("score"))
-    //scoreDFDst.show(20, false)
+    scoreDFDst.show(20, false)
 
 
     // Crescita/decrescita per anni/mesi
@@ -87,10 +87,10 @@ object analyseData extends App {
 
 
     scoreDF = scoreDF.withColumn("score",growingYearBonuses_($"score", $"num_visualiz_anno")).sort(desc("score"))
-    //scoreDF.show(20, false)
+    scoreDF.show(20, false)
 
     scoreDFDst = scoreDFDst.withColumn("score",growingYearBonuses_($"score", $"num_visualiz_anno")).sort(desc("score"))
-    //scoreDFDst.show(20, false)
+    scoreDFDst.show(20, false)
 
 
     def growingMonthBonuses_ = udf((score: Double, xs: WA[AnyVal]) => {
@@ -111,10 +111,10 @@ object analyseData extends App {
 
 
     scoreDF = scoreDF.withColumn("score",growingMonthBonuses_($"score", $"num_visualiz_mesi")).sort(desc("score"))
-    //scoreDF.show(20, false)
+    scoreDF.show(20, false)
 
     scoreDFDst = scoreDFDst.withColumn("score",growingMonthBonuses_($"score", $"num_visualiz_mesi")).sort(desc("score"))
-    //scoreDFDst.show(20, false)
+    scoreDFDst.show(20, false)
 
     val maxScoreSrc = scoreDF.first().getAs[Double](8)
     val maxScoreDst = scoreDFDst.first().getAs[Double](7)
@@ -126,7 +126,7 @@ object analyseData extends App {
       .na.fill(0, Seq("scoreIta"))
       .sort(desc("score"))
 
-    //scoreDF.show(20, false)
+    scoreDF.show(20, false)
 
 
     //riuniune score su tabella inglese
@@ -140,7 +140,7 @@ object analyseData extends App {
 
     scoreDF = scoreDF.withColumn("score", sumMean_($"score", $"id_pagina_tradotta", $"scoreIta")).sort(desc("score"))
     scoreDF = scoreDF.drop("sum","scoreIta","id_pagina_tradotta")
-    //scoreDF.show(20, false)
+    scoreDF.show(20, false)
 
 
     //dimensioni
@@ -175,14 +175,14 @@ object analyseData extends App {
 
     println("translateBonus_")
     dataFrameSize = dataFrameSize.withColumn("score", translateBonus_($"score", $"id_ita", $"byte_dim_page", $"byte_dim_page_tot", $"byte_dim_page_ita_original", $"id_traduzioni_redirect_dim")).sort(desc("score"))
-    //dataFrameSize.show(20, false)
+    dataFrameSize.show(20, false)
 
 
     // riporto lo score
     scoreDF = scoreDF.drop("score").join(dataFrameSize.select("id", "score"), Seq("id")).sort(desc("score"))
     scoreDF.show(20,false)
 
-
+    //scoreDF.write.parquet(outputFolderName)
 
 
 
