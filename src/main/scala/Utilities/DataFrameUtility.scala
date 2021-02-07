@@ -12,12 +12,7 @@ package Utilities {
 
   object DataFrameUtility {
 
-    val numPartitions = 8
-
-    def readParquetFromFoldersAndShow(folders: Array[String]): Array[String] = {
-      //collectParquetFilesFromFolders(folders)
-      Array()
-    }
+    var numPartitions = 8
 
     def collectParquetFilesFromFolders(folders: Array[String]): Array[String] = {
 

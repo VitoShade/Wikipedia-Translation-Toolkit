@@ -1,29 +1,65 @@
 [debug] Created transactional ClassFileManager with tempDir = C:\Users\nik_9\IdeaProjects\Wikipedia-Translation-Toolkit\target\scala-2.12\classes.bak
 [debug] About to delete class files:
+[debug] 	prepareData$.class
+[debug] 	downloadData.class
+[debug] 	prepareData$$typecreator8$1.class
+[debug] 	prepareData$$typecreator1$1.class
+[debug] 	prepareData$$typecreator4$2.class
+[debug] 	downloadData$$typecreator13$1.class
 [debug] 	analyseData$$typecreator1$2.class
 [debug] 	analyseData$$typecreator1$3.class
 [debug] 	analyseData$$typecreator3$1.class
+[debug] 	prepareData$$typecreator5$1.class
+[debug] 	downloadData$$typecreator5$1.class
 [debug] 	analyseData$.class
 [debug] 	analyseData.class
 [debug] 	analyseData$$typecreator1$1.class
 [debug] 	analyseData$$typecreator2$1.class
+[debug] 	prepareData$$typecreator4$1.class
+[debug] 	prepareData.class
+[debug] 	prepareData$$typecreator4$3.class
 [debug] 	analyseData$$typecreator4$1.class
+[debug] 	downloadData$.class
 [debug] We backup class files:
+[debug] 	prepareData$.class
+[debug] 	downloadData.class
+[debug] 	prepareData$$typecreator8$1.class
+[debug] 	prepareData$$typecreator1$1.class
+[debug] 	prepareData$$typecreator4$2.class
+[debug] 	downloadData$$typecreator13$1.class
 [debug] 	analyseData$$typecreator1$2.class
 [debug] 	analyseData$$typecreator1$3.class
 [debug] 	analyseData$$typecreator3$1.class
+[debug] 	prepareData$$typecreator5$1.class
+[debug] 	downloadData$$typecreator5$1.class
 [debug] 	analyseData$.class
 [debug] 	analyseData.class
 [debug] 	analyseData$$typecreator1$1.class
 [debug] 	analyseData$$typecreator2$1.class
+[debug] 	prepareData$$typecreator4$1.class
+[debug] 	prepareData.class
+[debug] 	prepareData$$typecreator4$3.class
 [debug] 	analyseData$$typecreator4$1.class
+[debug] 	downloadData$.class
 [debug] Registering generated classes:
+[debug] 	prepareData$.class
+[debug] 	downloadData.class
+[debug] 	prepareData$$typecreator8$1.class
+[debug] 	prepareData$$typecreator1$1.class
+[debug] 	prepareData$$typecreator4$2.class
+[debug] 	downloadData$$typecreator13$1.class
 [debug] 	analyseData$$typecreator1$2.class
 [debug] 	analyseData$$typecreator1$3.class
 [debug] 	analyseData$$typecreator3$1.class
+[debug] 	prepareData$$typecreator5$1.class
+[debug] 	downloadData$$typecreator5$1.class
 [debug] 	analyseData$.class
 [debug] 	analyseData.class
 [debug] 	analyseData$$typecreator1$1.class
 [debug] 	analyseData$$typecreator2$1.class
+[debug] 	prepareData$$typecreator4$1.class
+[debug] 	prepareData.class
+[debug] 	prepareData$$typecreator4$3.class
 [debug] 	analyseData$$typecreator4$1.class
+[debug] 	downloadData$.class
 [debug] Removing the temporary directory used for backing up class files: C:\Users\nik_9\IdeaProjects\Wikipedia-Translation-Toolkit\target\scala-2.12\classes.bak

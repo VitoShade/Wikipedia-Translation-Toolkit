@@ -1,8 +1,11 @@
+
 import Utilities._
+import org.apache.commons.io.FileUtils
 import org.apache.spark.sql.SparkSession
 import org.apache.spark.sql.functions.desc
 import scala.collection.mutable.{WrappedArray => WA}
 import org.apache.spark.sql.functions.udf
+import java.io.File
 import scala.math._
 
 object analyseData extends App {
@@ -12,17 +15,27 @@ object analyseData extends App {
     val sparkSession = SparkSession.builder().appName("analyseData").getOrCreate()
     val sparkContext = sparkSession.sparkContext
 
+    if(args.length > 0)
+      DataFrameUtility.numPartitions = args(0).toInt
+
+    println("Working with " + DataFrameUtility.numPartitions + " partitions")
+
     sparkContext.setLogLevel("WARN")
 
     //per convertire RDD in DataFrame
     import sparkSession.implicits._
 
-    //val inputFolderName = "C:\\Users\\nik_9\\Desktop\\prova\\datiFinali"
-    //val outputFolderName  = "C:\\Users\\nik_9\\Desktop\\prova\\risultato"
-    //val folderSeparator = "\\"
+    /*
+    val inputFolderName = "C:\\Users\\nik_9\\Desktop\\prova\\datiFinali"
+    val outputFolderName  = "C:\\Users\\nik_9\\Desktop\\prova\\risultato"
+    val folderSeparator = "\\"
+    */
+
     val inputFolderName   = "s3n://wtt-s3-1/datiFinali"
     val outputFolderName  = "s3n://wtt-s3-1/risultato"
     val folderSeparator   = "/"
+
+    val startTime = System.currentTimeMillis()
 
     //dataFrame dai parquet inglesi
     val dataFrameSrc = DataFrameUtility.dataFrameFromFoldersRecursively(Array(inputFolderName), "en", sparkSession)
@@ -32,9 +45,6 @@ object analyseData extends App {
 
     //dataframe delle dimensioni
     var dataFrameSize = DataFrameUtility.dataFrameFromFoldersRecursively(Array(inputFolderName),"size", sparkSession)
-
-    val startTime = System.currentTimeMillis()
-
 
 
     // DF standard
@@ -182,7 +192,9 @@ object analyseData extends App {
     scoreDF = scoreDF.drop("score").join(dataFrameSize.select("id", "score"), Seq("id")).sort(desc("score"))
     scoreDF.show(20,false)
 
-    scoreDF.write.parquet(outputFolderName)
+
+    FileUtils.deleteDirectory(new File(outputFolderName))
+    scoreDF.repartition(DataFrameUtility.numPartitions).write.parquet(outputFolderName)
 
 
 

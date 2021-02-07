@@ -1,7 +1,7 @@
 import org.apache.spark.sql.SparkSession
 
 object showData extends App {
-  def mainX(args: Array[String]) {
+  override def main(args: Array[String]) {
 
     val sparkSession = SparkSession.builder().master("local[4]").appName("showData").getOrCreate()
     val sparkContext = sparkSession.sparkContext

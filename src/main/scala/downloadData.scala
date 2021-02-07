@@ -8,23 +8,37 @@ import java.net.URLDecoder
 import java.nio.charset.StandardCharsets
 
 object downloadData extends App {
-  def mainX(args: Array[String]) {
+  override def main(args: Array[String]) {
 
     val sparkSession = SparkSession.builder().master("local[20]").appName("downloadData").getOrCreate()
+    //val sparkSession = SparkSession.builder().appName("downloadData").getOrCreate()
     val sparkContext = sparkSession.sparkContext
+
+    if(args.length > 0)
+      DataFrameUtility.numPartitions = args(0).toInt
+
+    println("Working with " + DataFrameUtility.numPartitions + " partitions")
 
     sparkContext.setLogLevel("WARN")
 
     //per convertire RDD in DataFrame
     import sparkSession.implicits._
 
-    val startTime = System.currentTimeMillis()
+    val inputFolderName   = "C:\\Users\\nik_9\\Desktop\\prova\\indici"
+    val tempFolderName    = "C:\\Users\\nik_9\\Desktop\\prova\\tempResult"
+    val outputFolderName  = "C:\\Users\\nik_9\\Desktop\\prova\\result"
+    val errorFolderName   = "C:\\Users\\nik_9\\Desktop\\prova\\result\\error"
+    val folderSeparator   = "\\"
 
-    val inputFolderName = "C:\\Users\\nik_9\\Desktop\\prova\\indici"
-    val tempFolderName = "C:\\Users\\nik_9\\Desktop\\prova\\tempResult"
-    val outputFolderName = "C:\\Users\\nik_9\\Desktop\\prova\\result"
-    val errorFolderName = "C:\\Users\\nik_9\\Desktop\\prova\\result\\error"
-    val folderSeparator = "\\"
+    /*
+    val inputFolderName   = "s3n://wtt-s3-1/download/indici"
+    val tempFolderName    = "s3n://wtt-s3-1/download/tempResult"
+    val outputFolderName  = "s3n://wtt-s3-1/download/result"
+    val errorFolderName   = "s3n://wtt-s3-1/download/result/error"
+    val folderSeparator   = "/"
+    */
+
+    val startTime = System.currentTimeMillis()
 
     val inputFolder = new File(inputFolderName)
 
@@ -42,7 +56,7 @@ object downloadData extends App {
     inputFiles.foreach(inputFileName => {
 
       //caricamento del file di input e divisione in task
-      val input = sparkContext.textFile(inputFileName, 60)
+      val input = sparkContext.textFile(inputFileName, DataFrameUtility.numPartitions)
 
       var counter = 0
 

@@ -1,4 +1,73 @@
-[0m[[0m[0mdebug[0m] [0m[0mPackaging /Users/marco/IdeaProjects/Wikipedia-Translation-Toolkit/target/scala-2.12/wikipedia-translation-toolkit_2.12-0.1.jar ...[0m
-[0m[[0m[0mdebug[0m] [0m[0mInput file mappings:[0m
-[0m[[0m[0mdebug[0m] [0m[0m	[0m
-[0m[[0m[0mdebug[0m] [0m[0mDone packaging.[0m
+[debug] Packaging C:\Users\nik_9\IdeaProjects\Wikipedia-Translation-Toolkit\target\scala-2.12\wikipedia-translation-toolkit_2.12-0.1.jar ...
+[debug] Input file mappings:
+[debug] 	analyseData$$typecreator1$1.class
+[debug] 	  C:\Users\nik_9\IdeaProjects\Wikipedia-Translation-Toolkit\target\scala-2.12\classes\analyseData$$typecreator1$1.class
+[debug] 	analyseData$$typecreator1$2.class
+[debug] 	  C:\Users\nik_9\IdeaProjects\Wikipedia-Translation-Toolkit\target\scala-2.12\classes\analyseData$$typecreator1$2.class
+[debug] 	analyseData$$typecreator1$3.class
+[debug] 	  C:\Users\nik_9\IdeaProjects\Wikipedia-Translation-Toolkit\target\scala-2.12\classes\analyseData$$typecreator1$3.class
+[debug] 	analyseData$$typecreator2$1.class
+[debug] 	  C:\Users\nik_9\IdeaProjects\Wikipedia-Translation-Toolkit\target\scala-2.12\classes\analyseData$$typecreator2$1.class
+[debug] 	analyseData$$typecreator3$1.class
+[debug] 	  C:\Users\nik_9\IdeaProjects\Wikipedia-Translation-Toolkit\target\scala-2.12\classes\analyseData$$typecreator3$1.class
+[debug] 	analyseData$$typecreator4$1.class
+[debug] 	  C:\Users\nik_9\IdeaProjects\Wikipedia-Translation-Toolkit\target\scala-2.12\classes\analyseData$$typecreator4$1.class
+[debug] 	analyseData$.class
+[debug] 	  C:\Users\nik_9\IdeaProjects\Wikipedia-Translation-Toolkit\target\scala-2.12\classes\analyseData$.class
+[debug] 	analyseData.class
+[debug] 	  C:\Users\nik_9\IdeaProjects\Wikipedia-Translation-Toolkit\target\scala-2.12\classes\analyseData.class
+[debug] 	API
+[debug] 	  C:\Users\nik_9\IdeaProjects\Wikipedia-Translation-Toolkit\target\scala-2.12\classes\API
+[debug] 	API\APILangLinks$.class
+[debug] 	  C:\Users\nik_9\IdeaProjects\Wikipedia-Translation-Toolkit\target\scala-2.12\classes\API\APILangLinks$.class
+[debug] 	API\APILangLinks.class
+[debug] 	  C:\Users\nik_9\IdeaProjects\Wikipedia-Translation-Toolkit\target\scala-2.12\classes\API\APILangLinks.class
+[debug] 	API\APIPageView$.class
+[debug] 	  C:\Users\nik_9\IdeaProjects\Wikipedia-Translation-Toolkit\target\scala-2.12\classes\API\APIPageView$.class
+[debug] 	API\APIPageView.class
+[debug] 	  C:\Users\nik_9\IdeaProjects\Wikipedia-Translation-Toolkit\target\scala-2.12\classes\API\APIPageView.class
+[debug] 	API\APIRedirect$.class
+[debug] 	  C:\Users\nik_9\IdeaProjects\Wikipedia-Translation-Toolkit\target\scala-2.12\classes\API\APIRedirect$.class
+[debug] 	API\APIRedirect.class
+[debug] 	  C:\Users\nik_9\IdeaProjects\Wikipedia-Translation-Toolkit\target\scala-2.12\classes\API\APIRedirect.class
+[debug] 	downloadData$$typecreator13$1.class
+[debug] 	  C:\Users\nik_9\IdeaProjects\Wikipedia-Translation-Toolkit\target\scala-2.12\classes\downloadData$$typecreator13$1.class
+[debug] 	downloadData$$typecreator5$1.class
+[debug] 	  C:\Users\nik_9\IdeaProjects\Wikipedia-Translation-Toolkit\target\scala-2.12\classes\downloadData$$typecreator5$1.class
+[debug] 	downloadData$.class
+[debug] 	  C:\Users\nik_9\IdeaProjects\Wikipedia-Translation-Toolkit\target\scala-2.12\classes\downloadData$.class
+[debug] 	downloadData.class
+[debug] 	  C:\Users\nik_9\IdeaProjects\Wikipedia-Translation-Toolkit\target\scala-2.12\classes\downloadData.class
+[debug] 	prepareData$$typecreator1$1.class
+[debug] 	  C:\Users\nik_9\IdeaProjects\Wikipedia-Translation-Toolkit\target\scala-2.12\classes\prepareData$$typecreator1$1.class
+[debug] 	prepareData$$typecreator4$1.class
+[debug] 	  C:\Users\nik_9\IdeaProjects\Wikipedia-Translation-Toolkit\target\scala-2.12\classes\prepareData$$typecreator4$1.class
+[debug] 	prepareData$$typecreator4$2.class
+[debug] 	  C:\Users\nik_9\IdeaProjects\Wikipedia-Translation-Toolkit\target\scala-2.12\classes\prepareData$$typecreator4$2.class
+[debug] 	prepareData$$typecreator4$3.class
+[debug] 	  C:\Users\nik_9\IdeaProjects\Wikipedia-Translation-Toolkit\target\scala-2.12\classes\prepareData$$typecreator4$3.class
+[debug] 	prepareData$$typecreator5$1.class
+[debug] 	  C:\Users\nik_9\IdeaProjects\Wikipedia-Translation-Toolkit\target\scala-2.12\classes\prepareData$$typecreator5$1.class
+[debug] 	prepareData$$typecreator8$1.class
+[debug] 	  C:\Users\nik_9\IdeaProjects\Wikipedia-Translation-Toolkit\target\scala-2.12\classes\prepareData$$typecreator8$1.class
+[debug] 	prepareData$.class
+[debug] 	  C:\Users\nik_9\IdeaProjects\Wikipedia-Translation-Toolkit\target\scala-2.12\classes\prepareData$.class
+[debug] 	prepareData.class
+[debug] 	  C:\Users\nik_9\IdeaProjects\Wikipedia-Translation-Toolkit\target\scala-2.12\classes\prepareData.class
+[debug] 	showData$.class
+[debug] 	  C:\Users\nik_9\IdeaProjects\Wikipedia-Translation-Toolkit\target\scala-2.12\classes\showData$.class
+[debug] 	showData.class
+[debug] 	  C:\Users\nik_9\IdeaProjects\Wikipedia-Translation-Toolkit\target\scala-2.12\classes\showData.class
+[debug] 	Utilities
+[debug] 	  C:\Users\nik_9\IdeaProjects\Wikipedia-Translation-Toolkit\target\scala-2.12\classes\Utilities
+[debug] 	Utilities\DataFrameUtility$$typecreator4$1.class
+[debug] 	  C:\Users\nik_9\IdeaProjects\Wikipedia-Translation-Toolkit\target\scala-2.12\classes\Utilities\DataFrameUtility$$typecreator4$1.class
+[debug] 	Utilities\DataFrameUtility$$typecreator4$2.class
+[debug] 	  C:\Users\nik_9\IdeaProjects\Wikipedia-Translation-Toolkit\target\scala-2.12\classes\Utilities\DataFrameUtility$$typecreator4$2.class
+[debug] 	Utilities\DataFrameUtility$$typecreator9$1.class
+[debug] 	  C:\Users\nik_9\IdeaProjects\Wikipedia-Translation-Toolkit\target\scala-2.12\classes\Utilities\DataFrameUtility$$typecreator9$1.class
+[debug] 	Utilities\DataFrameUtility$.class
+[debug] 	  C:\Users\nik_9\IdeaProjects\Wikipedia-Translation-Toolkit\target\scala-2.12\classes\Utilities\DataFrameUtility$.class
+[debug] 	Utilities\DataFrameUtility.class
+[debug] 	  C:\Users\nik_9\IdeaProjects\Wikipedia-Translation-Toolkit\target\scala-2.12\classes\Utilities\DataFrameUtility.class
+[debug] Done packaging.

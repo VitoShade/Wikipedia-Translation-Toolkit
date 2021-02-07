@@ -5,30 +5,45 @@ import API.{APILangLinks, APIPageView, APIRedirect}
 import org.apache.spark.sql.{DataFrame, SparkSession}
 import Utilities._
 import org.apache.commons.io.FileUtils
-import org.apache.spark.sql.functions.{col, collect_set, desc, sum, udf, when}
+import org.apache.spark.sql.functions.{col, collect_set, sum, udf, when}
 import scala.collection.mutable
 import scala.collection.mutable.{WrappedArray => WA}
 
 
 object prepareData extends App {
-  def mainX(args: Array[String]) {
+  override def main(args: Array[String]) {
 
     val sparkSession = SparkSession.builder().master("local[8]").appName("prepareData").getOrCreate()
+    //val sparkSession = SparkSession.builder().appName("prepareData").getOrCreate()
     val sparkContext = sparkSession.sparkContext
+
+    if(args.length > 0)
+      DataFrameUtility.numPartitions = args(0).toInt
+
+    println("Working with " + DataFrameUtility.numPartitions + " partitions")
 
     sparkContext.setLogLevel("WARN")
 
     //per convertire RDD in DataFrame
     import sparkSession.implicits._
 
-    val startTime = System.currentTimeMillis()
+    val inputFolderName   = "C:\\Users\\nik_9\\Desktop\\prova\\outputProcessati"
+    val tempFolderName    = "C:\\Users\\nik_9\\Desktop\\prova\\tempOutput"
+    val errorFolderName   = "C:\\Users\\nik_9\\Desktop\\prova\\tempOutput\\error"
+    val outputFolderName  = "C:\\Users\\nik_9\\Desktop\\prova\\datiFinali"
+    val sizeFolderName    = "C:\\Users\\nik_9\\Desktop\\prova\\datiFinali\\size"
+    val folderSeparator   = "\\"
 
-    val inputFolderName  = "C:\\Users\\nik_9\\Desktop\\prova\\outputProcessati"
-    val tempFolderName   = "C:\\Users\\nik_9\\Desktop\\prova\\tempOutput"
-    val errorFolderName  = "C:\\Users\\nik_9\\Desktop\\prova\\tempOutput\\error"
-    val outputFolderName = "C:\\Users\\nik_9\\Desktop\\prova\\datiFinali"
-    val sizeFolderName   = "C:\\Users\\nik_9\\Desktop\\prova\\datiFinali\\size"
-    val folderSeparator = "\\"
+    /*
+    val inputFolderName   = "s3n://wtt-s3-1/downloaded/outputProcessati"
+    val tempFolderName    = "s3n://wtt-s3-1/downloaded/tempOutput"
+    val errorFolderName   = "s3n://wtt-s3-1/downloaded/tempOutput/error"
+    val outputFolderName  = "s3n://wtt-s3-1/downloaded/datiFinali"
+    val sizeFolderName    = "s3n://wtt-s3-1/downloaded/datiFinali/size"
+    val folderSeparator   = "/"
+    */
+
+    val startTime = System.currentTimeMillis()
 
     // Retry errori durante downloadData e pulizia link a pagine italiane
     /*FileUtils.deleteDirectory(new File(errorFolderName))
@@ -61,11 +76,11 @@ object prepareData extends App {
     // Pulizia directory
     FileUtils.deleteDirectory(new File(outputFolderName + folderSeparator + "en"))
     FileUtils.deleteDirectory(new File(outputFolderName + folderSeparator + "it"))
-    //FileUtils.deleteDirectory(new File(sizeFolderName))
+    FileUtils.deleteDirectory(new File(sizeFolderName))
 
-    //resultDataFrameSrc.write.parquet(outputFolderName + folderSeparator + "en")
-    //resultDataFrameDst.write.parquet(outputFolderName + folderSeparator + "it")
-    //dimPageDF.write.parquet(sizeFolderName)
+    resultDataFrameSrc.write.parquet(outputFolderName + folderSeparator + "en")
+    resultDataFrameDst.write.parquet(outputFolderName + folderSeparator + "it")
+    dimPageDF.repartition(DataFrameUtility.numPartitions).write.parquet(sizeFolderName)
 
     //Controllo se è corretto
     val removeEmpty = udf((array: Seq[String]) => !array.isEmpty)
@@ -218,8 +233,9 @@ object prepareData extends App {
 
     val res = mainDF.map(row => {
       val (redirectID, dimRedirect) = mappa2(row.getString(2))
-      (row.getString(0), row.getString(2), row.getInt(5), row.getAs[mutable.WrappedArray[String]](6), redirectID, dimRedirect)
-    }).toDF("id", "id_pagina_tradotta",  "byte_dim_page", "id_traduzioni_redirect", "id_ita", "byte_dim_page_ita_original")
+      val arr = row.getAs[mutable.WrappedArray[String]](6).map(redirectID => mappa2(redirectID)._1)
+      (row.getString(0), row.getInt(5), arr, redirectID, dimRedirect, arr.map(redirectID => mappa2(redirectID)._2).sum)
+    }).toDF("id",  "byte_dim_page", "id_traduzioni_redirect", "id_ita", "byte_dim_page_ita_original", "id_traduzioni_redirect_dim")
 
     val sumDF = res.groupBy("id_ita")
       .sum("byte_dim_page")
