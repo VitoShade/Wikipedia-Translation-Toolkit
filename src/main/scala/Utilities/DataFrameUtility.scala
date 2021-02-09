@@ -39,13 +39,20 @@ package Utilities {
 
       queue ++= folders
 
+      println("queue " + queue)
+
       while(queue.nonEmpty) {
 
         val folder = new File(queue.dequeue())
 
+        println("folder " + folder)
+
         if(folder.toString.takeRight(subFolder.length) == subFolder) {
 
           val files = folder.listFiles.filter(file => file.isFile && (file.toString.takeRight(15) == ".snappy.parquet")).map(file => file.toString)
+
+          println("files ")
+          files.foreach(println(_))
 
           allParquetFiles = allParquetFiles ++ files
         }

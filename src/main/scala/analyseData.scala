@@ -35,16 +35,20 @@ object analyseData extends App {
     val outputFolderName  = "s3n://wtt-s3-1/risultato"
     val folderSeparator   = "/"
 
+
     val startTime = System.currentTimeMillis()
 
     //dataFrame dai parquet inglesi
-    val dataFrameSrc = DataFrameUtility.dataFrameFromFoldersRecursively(Array(inputFolderName), "en", sparkSession)
+    //val dataFrameSrc = DataFrameUtility.dataFrameFromFoldersRecursively(Array(inputFolderName), "en", sparkSession)
+    val dataFrameSrc = sparkSession.read.parquet(inputFolderName + folderSeparator + "en" + folderSeparator + "part-00000-21358f3e-1fa2-43ed-a8ec-e373bd0add99-c000.snappy.parquet")
 
     //dataFrame dai parquet italiani
-    val dataFrameDst = DataFrameUtility.dataFrameFromFoldersRecursively(Array(inputFolderName), "it", sparkSession)
+    //val dataFrameDst = DataFrameUtility.dataFrameFromFoldersRecursively(Array(inputFolderName), "it", sparkSession)
+    val dataFrameDst = sparkSession.read.parquet(inputFolderName + folderSeparator + "it" + folderSeparator + "part-00000-53dfa14b-55b2-42cd-bc23-8a557c4e976d-c000.snappy.parquet")
 
     //dataframe delle dimensioni
-    var dataFrameSize = DataFrameUtility.dataFrameFromFoldersRecursively(Array(inputFolderName),"size", sparkSession)
+    //var dataFrameSize = DataFrameUtility.dataFrameFromFoldersRecursively(Array(inputFolderName),"size", sparkSession)
+    var dataFrameSize = sparkSession.read.parquet(inputFolderName + folderSeparator + "size" + folderSeparator + "part-00000-e6533178-ebae-4b84-9818-b23ff5e470e8-c000.snappy.parquet")
 
 
     // DF standard
@@ -193,8 +197,9 @@ object analyseData extends App {
     scoreDF.show(20,false)
 
 
-    FileUtils.deleteDirectory(new File(outputFolderName))
-    scoreDF.repartition(DataFrameUtility.numPartitions).write.parquet(outputFolderName)
+    //FileUtils.deleteDirectory(new File(outputFolderName))
+    //scoreDF.repartition(DataFrameUtility.numPartitions).write.parquet(outputFolderName)
+    //scoreDF.write.parquet(outputFolderName)
 
 
 
