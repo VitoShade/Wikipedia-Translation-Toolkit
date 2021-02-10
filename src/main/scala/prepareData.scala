@@ -56,7 +56,8 @@ object prepareData extends App {
 
 
     // DataFrame dai parquet inglesi
-    val dataFrameSrc = DataFrameUtility.dataFrameFromFoldersRecursively(Array(tempFolderName), "en", sparkSession)
+    //val dataFrameSrc = DataFrameUtility.dataFrameFromFoldersRecursively(Array(tempFolderName), "en", sparkSession)
+    val dataFrameSrc = sparkSession.read.parquet(tempFolderName + folderSeparator + "en" + folderSeparator + "XXX")
 
     // Compressione dataframe da tradurre (togliendo redirect)
     val compressedSrc = compressRedirect(dataFrameSrc, sparkSession).repartition(DataFrameUtility.numPartitions)

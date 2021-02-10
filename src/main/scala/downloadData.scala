@@ -14,10 +14,7 @@ object downloadData extends App {
     //val sparkSession = SparkSession.builder().appName("downloadData").getOrCreate()
     val sparkContext = sparkSession.sparkContext
 
-    if(args.length > 0)
-      DataFrameUtility.numPartitions = args(0).toInt
-
-    println("Working with " + DataFrameUtility.numPartitions + " partitions")
+    //println("Working with " + DataFrameUtility.numPartitions + " partitions")
 
     sparkContext.setLogLevel("WARN")
 
@@ -25,7 +22,7 @@ object downloadData extends App {
     import sparkSession.implicits._
 
     val inputFolderName   = "C:\\Users\\nik_9\\Desktop\\prova\\indici"
-    val tempFolderName    = "C:\\Users\\nik_9\\Desktop\\prova\\tempResult"
+    //val tempFolderName    = "C:\\Users\\nik_9\\Desktop\\prova\\tempResult"
     val outputFolderName  = "C:\\Users\\nik_9\\Desktop\\prova\\result"
     val errorFolderName   = "C:\\Users\\nik_9\\Desktop\\prova\\result\\error"
     val folderSeparator   = "\\"
@@ -40,10 +37,10 @@ object downloadData extends App {
 
     val startTime = System.currentTimeMillis()
 
-    val inputFolder = new File(inputFolderName)
+    //val inputFolder = new File(inputFolderName)
 
     //raccolta di tutti i file .txt nella cartella di input
-    val inputFiles = inputFolder.listFiles.filter(file => file.isFile && (file.toString.takeRight(4) == ".txt")).map(file => file.toString)
+    //val inputFiles = inputFolder.listFiles.filter(file => file.isFile && (file.toString.takeRight(4) == ".txt")).map(file => file.toString)
 
     var tempOutputFoldersSrc = Array[String]()
     var tempOutputFoldersDst = Array[String]()
@@ -168,14 +165,9 @@ object downloadData extends App {
 
     notCompressedDataFrameSrc.show(false)
 
-    //calcolo del numero di file di output(numero di partizioni)
-    var numPartitionsSrc = tempOutputFoldersSrc.length / 2
-
-    if(numPartitionsSrc < 1)
-      numPartitionsSrc = 1
 
     //una partizione ogni 2 file di input
-    val resultDataFrameSrc = notCompressedDataFrameSrc.coalesce(numPartitionsSrc)
+    val resultDataFrameSrc = notCompressedDataFrameSrc.coalesce(1)
 
     resultDataFrameSrc.write.parquet(outputFolderName + folderSeparator + "en")
 
@@ -188,13 +180,8 @@ object downloadData extends App {
 
     notCompressedDataFrameDst.show(false)
 
-    var numPartitionsDst = numPartitionsSrc / 4
-
-    if(numPartitionsDst < 1)
-      numPartitionsDst = 1
-
     //un quarto delle partizioni rispetto alla lingua di partenza
-    val resultDataFrameDst = notCompressedDataFrameDst.coalesce(numPartitionsDst)
+    val resultDataFrameDst = notCompressedDataFrameDst.coalesce(1)
 
     resultDataFrameDst.write.parquet(outputFolderName + folderSeparator + "it")
 
