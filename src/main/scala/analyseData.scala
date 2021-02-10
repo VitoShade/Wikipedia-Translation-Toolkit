@@ -5,11 +5,11 @@ import scala.collection.mutable.{WrappedArray => WA}
 import org.apache.spark.sql.functions.udf
 import scala.math._
 
-object analyseData extends App {
+object analyseData extends App{
   override def main(args: Array[String]) {
 
-    //val sparkSession = SparkSession.builder().master("local[16]").appName("analyseData").getOrCreate()
-    val sparkSession = SparkSession.builder().appName("analyseData").getOrCreate()
+    val sparkSession = SparkSession.builder().master("local[16]").appName("analyseData").getOrCreate()
+    //val sparkSession = SparkSession.builder().appName("analyseData").getOrCreate()
     val sparkContext = sparkSession.sparkContext
 
     sparkContext.setLogLevel("WARN")
@@ -17,10 +17,12 @@ object analyseData extends App {
     //per convertire RDD in DataFrame
     import sparkSession.implicits._
 
-    //val inputFolderName = "/Users/stefano/IdeaProjects/Wikipedia-Translation-Toolkit/src/main/files/datiFinali"
+    val inputFolderName = "/Users/stefano/IdeaProjects/Wikipedia-Translation-Toolkit/src/main/files/datiFinali"
+    val outputFolderName  = "/Users/stefano/IdeaProjects/Wikipedia-Translation-Toolkit/src/main/files/risultato"
+
     //val sizeFolderName = "/Users/stefano/IdeaProjects/Wikipedia-Translation-Toolkit/src/main/files/datiFinali/size"
-    val inputFolderName   = "s3n://wtt-s3-1/datiFinali"
-    val outputFolderName  = "s3n://wtt-s3-1/risultato"
+    //val inputFolderName   = "s3n://wtt-s3-1/datiFinali"
+    //val outputFolderName  = "s3n://wtt-s3-1/risultato"
     val folderSeparator   = "/"
 
     //dataFrame dai parquet inglesi

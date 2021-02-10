@@ -12,7 +12,7 @@ import scala.collection.mutable.{WrappedArray => WA}
 
 
 object prepareData extends App {
-  def mainX(args: Array[String]) {
+  override def main(args: Array[String]) {
 
     val sparkSession = SparkSession.builder().master("local[16]").appName("prepareData").getOrCreate()
     val sparkContext = sparkSession.sparkContext
@@ -64,9 +64,9 @@ object prepareData extends App {
     FileUtils.deleteDirectory(new File(outputFolderName + folderSeparator + "it"))
     FileUtils.deleteDirectory(new File(sizeFolderName))
 
-    resultDataFrameSrc.write.parquet(outputFolderName + folderSeparator + "en")
-    resultDataFrameDst.write.parquet(outputFolderName + folderSeparator + "it")
-    dimPageDF.repartition(DataFrameUtility.numPartitions).write.parquet(sizeFolderName)
+    resultDataFrameSrc.coalesce(1).write.parquet(outputFolderName + folderSeparator + "en")
+    resultDataFrameDst.coalesce(1).write.parquet(outputFolderName + folderSeparator + "it")
+    dimPageDF.coalesce(1).write.parquet(sizeFolderName)
 
     //Controllo se è corretto
     val removeEmpty = udf((array: Seq[String]) => !array.isEmpty)

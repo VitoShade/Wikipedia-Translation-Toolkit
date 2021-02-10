@@ -8,7 +8,7 @@ import java.net.URLDecoder
 import java.nio.charset.StandardCharsets
 
 object downloadData extends App {
-  def mainX(args: Array[String]) {
+  override def main(args: Array[String]) {
 
     val sparkSession = SparkSession.builder().master("local[20]").appName("downloadData").getOrCreate()
     val sparkContext = sparkSession.sparkContext
