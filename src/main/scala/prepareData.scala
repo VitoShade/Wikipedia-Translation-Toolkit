@@ -1,13 +1,11 @@
 import java.io.File
 import java.net.URLDecoder
 import java.nio.charset.StandardCharsets
-
 import API.{APILangLinks, APIPageView, APIRedirect}
 import org.apache.spark.sql.{DataFrame, SparkSession}
 import Utilities._
 import org.apache.commons.io.FileUtils
-import org.apache.spark.sql.functions.{col, collect_set, desc, sum, udf, when}
-
+import org.apache.spark.sql.functions.{col, collect_set, sum, udf, when}
 import scala.collection.mutable
 import scala.collection.mutable.{WrappedArray => WA}
 
@@ -15,27 +13,42 @@ import scala.collection.mutable.{WrappedArray => WA}
 object prepareData extends App {
   override def main(args: Array[String]) {
 
-    val sparkSession = SparkSession.builder().master("local[16]").appName("prepareData").getOrCreate()
+    val sparkSession = SparkSession.builder().master("local[8]").appName("prepareData").getOrCreate()
+    //val sparkSession = SparkSession.builder().appName("prepareData").getOrCreate()
     val sparkContext = sparkSession.sparkContext
+
+    //if(args.length > 0)
+    //  DataFrameUtility.numPartitions = args(0).toInt
+
+    //println("Working with " + DataFrameUtility.numPartitions + " partitions")
 
     sparkContext.setLogLevel("WARN")
 
     //per convertire RDD in DataFrame
     import sparkSession.implicits._
 
+    val inputFolderName   = "C:\\Users\\nik_9\\Desktop\\prova\\outputProcessati"
+    val tempFolderName    = "C:\\Users\\nik_9\\Desktop\\prova\\tempOutput"
+    val errorFolderName   = "C:\\Users\\nik_9\\Desktop\\prova\\tempOutput\\error"
+    val outputFolderName  = "C:\\Users\\nik_9\\Desktop\\prova\\datiFinali"
+    val sizeFolderName    = "C:\\Users\\nik_9\\Desktop\\prova\\datiFinali\\size"
+    val folderSeparator   = "\\"
+
+    /*
+    val inputFolderName   = "s3n://wtt-s3-1/downloaded/outputProcessati"
+    val tempFolderName    = "s3n://wtt-s3-1/downloaded/tempOutput"
+    val errorFolderName   = "s3n://wtt-s3-1/downloaded/tempOutput/error"
+    val outputFolderName  = "s3n://wtt-s3-1/downloaded/datiFinali"
+    val sizeFolderName    = "s3n://wtt-s3-1/downloaded/datiFinali/size"
+    val folderSeparator   = "/"
+    */
+
     val startTime = System.currentTimeMillis()
 
-    val inputFolderName  = "/Users/marco/IdeaProjects/Wikipedia-Translation-Toolkit/file/outputProcessati"
-    val tempFolderName   = "/Users/marco/IdeaProjects/Wikipedia-Translation-Toolkit/file/tmpOutput"
-    val outputFolderName = "/Users/marco/IdeaProjects/Wikipedia-Translation-Toolkit/file/datiFinali"
-    val errorFolderName  = "/Users/marco/IdeaProjects/Wikipedia-Translation-Toolkit/file/tmpOutput/error"
-    val sizeFolderName   = "/Users/marco/IdeaProjects/Wikipedia-Translation-Toolkit/file/datiFinali/size"
-    val folderSeparator = "/"
-
     // Retry errori durante downloadData e pulizia link a pagine italiane
-    FileUtils.deleteDirectory(new File(errorFolderName))
+    /*FileUtils.deleteDirectory(new File(errorFolderName))
     FileUtils.forceMkdir(new File(errorFolderName))
-    DataFrameUtility.retryPagesWithErrorAndReplace(inputFolderName, tempFolderName, errorFolderName, folderSeparator, sparkSession)
+    DataFrameUtility.retryPagesWithErrorAndReplace(inputFolderName, tempFolderName, errorFolderName, folderSeparator, sparkSession)*/
 
     APILangLinks.resetErrorList()
     APIPageView.resetErrorList()
@@ -43,16 +56,19 @@ object prepareData extends App {
 
 
     // DataFrame dai parquet inglesi
-    val dataFrameSrc = DataFrameUtility.dataFrameFromFoldersRecursively(Array(tempFolderName), "en", sparkSession)
+    //val dataFrameSrc = DataFrameUtility.dataFrameFromFoldersRecursively(Array(tempFolderName), "en", sparkSession)
+    //TODO cambiare XXX con nome parquet in input
+    val dataFrameSrc = sparkSession.read.parquet(tempFolderName + folderSeparator + "en" + folderSeparator + "XXX")
 
     // Compressione dataframe da tradurre (togliendo redirect)
-    val compressedSrc = compressRedirect(dataFrameSrc, sparkSession).repartition(DataFrameUtility.numPartitions)
+    val compressedSrc = compressRedirect(dataFrameSrc, sparkSession)//.repartition(DataFrameUtility.numPartitions)
 
     // DataFrame dai parquet italiani
-    var dataFrameDst = DataFrameUtility.dataFrameFromFoldersRecursively(Array(tempFolderName), "it", sparkSession).dropDuplicates().repartition(DataFrameUtility.numPartitions)
-
+    //var dataFrameDst = DataFrameUtility.dataFrameFromFoldersRecursively(Array(tempFolderName), "it", sparkSession).dropDuplicates()//.repartition(DataFrameUtility.numPartitions)
+    //TODO cambiare XXX con nome parquet in input
+    var dataFrameDst = sparkSession.read.parquet(tempFolderName + folderSeparator + "it" + folderSeparator + "XXX")
     // Chiamata per scaricare pagine italiane che si ottengono tramite redirect
-    dataFrameDst = missingIDsDF(dataFrameDst, errorFolderName, folderSeparator, sparkSession).dropDuplicates().repartition(DataFrameUtility.numPartitions)
+    dataFrameDst = missingIDsDF(dataFrameDst, errorFolderName, folderSeparator, sparkSession).dropDuplicates()//.repartition(DataFrameUtility.numPartitions)
 
     // Cancellazione pagine con errori
     val (resultDataFrameSrc, resultDataFrameDst) = removeErrorPages(compressedSrc, dataFrameDst, sparkSession, tempFolderName)
@@ -61,13 +77,13 @@ object prepareData extends App {
     val dimPageDF = makeDimDF(resultDataFrameSrc, resultDataFrameDst, sparkSession)
 
     // Pulizia directory
-    FileUtils.deleteDirectory(new File(outputFolderName + folderSeparator + "en"))
-    FileUtils.deleteDirectory(new File(outputFolderName + folderSeparator + "it"))
+    //FileUtils.deleteDirectory(new File(outputFolderName + folderSeparator + "en"))
+    //FileUtils.deleteDirectory(new File(outputFolderName + folderSeparator + "it"))
     //FileUtils.deleteDirectory(new File(sizeFolderName))
 
-    //resultDataFrameSrc.write.parquet(outputFolderName + folderSeparator + "en")
-    //resultDataFrameDst.write.parquet(outputFolderName + folderSeparator + "it")
-    //dimPageDF.write.parquet(sizeFolderName)
+    resultDataFrameSrc.coalesce(1).write.parquet(outputFolderName + folderSeparator + "en")
+    resultDataFrameDst.coalesce(1).write.parquet(outputFolderName + folderSeparator + "it")
+    dimPageDF.coalesce(1).write.parquet(sizeFolderName)
 
     //Controllo se è corretto
     val removeEmpty = udf((array: Seq[String]) => !array.isEmpty)
@@ -199,7 +215,11 @@ object prepareData extends App {
     //rimozione dalle pagine compresse di quelle con errori
     val resultDataFrameDst = dataFrameDst.except(joinedCompressedDst)
 
-    (resultDataFrameSrc.repartition(DataFrameUtility.numPartitions), resultDataFrameDst.repartition(DataFrameUtility.numPartitions))
+    (resultDataFrameSrc
+      //.repartition(DataFrameUtility.numPartitions)
+      ,
+      resultDataFrameDst//.repartition(DataFrameUtility.numPartitions)
+     )
   }
 
   def makeDimDF(mainDF: DataFrame, transDF: DataFrame, sparkSession: SparkSession) = {
@@ -220,14 +240,15 @@ object prepareData extends App {
 
     val res = mainDF.map(row => {
       val (redirectID, dimRedirect) = mappa2(row.getString(2))
-      (row.getString(0), row.getString(2), row.getInt(5), row.getAs[mutable.WrappedArray[String]](6), redirectID, dimRedirect)
-    }).toDF("id", "id_pagina_tradotta",  "byte_dim_page", "id_traduzioni_redirect", "id_ita", "byte_dim_page_ita_original")
+      val arr = row.getAs[mutable.WrappedArray[String]](6).map(redirectID => mappa2(redirectID)._1)
+      (row.getString(0), row.getInt(5), arr, redirectID, dimRedirect, arr.map(redirectID => mappa2(redirectID)._2).sum)
+    }).toDF("id",  "byte_dim_page", "id_traduzioni_redirect", "id_ita", "byte_dim_page_ita_original", "id_traduzioni_redirect_dim")
 
     val sumDF = res.groupBy("id_ita")
       .sum("byte_dim_page")
       .withColumnRenamed("sum(byte_dim_page)","byte_dim_page_tot")
       .withColumnRenamed("id_ita", "id_ita2")
-      .repartition(DataFrameUtility.numPartitions)
+      //.repartition(DataFrameUtility.numPartitions)
 
     res.join(sumDF, res("id_ita") === sumDF("id_ita2")).drop("id_ita2")
   }

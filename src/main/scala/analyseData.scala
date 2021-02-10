@@ -1,19 +1,18 @@
-import Utilities._
-import org.apache.spark.sql.SparkSession
-import org.apache.spark.sql.functions.{col, desc, lit}
-import org.apache.spark.sql.types.IntegerType
 
+import Utilities._
+import org.apache.commons.io.FileUtils
+import org.apache.spark.sql.SparkSession
+import org.apache.spark.sql.functions.desc
 import scala.collection.mutable.{WrappedArray => WA}
 import org.apache.spark.sql.functions.udf
-
-import scala.collection.mutable
+import java.io.File
 import scala.math._
 
 object analyseData extends App {
-
   override def main(args: Array[String]) {
 
-    val sparkSession = SparkSession.builder().master("local[32]").appName("analyseData").getOrCreate()
+    //val sparkSession = SparkSession.builder().master("local[4]").appName("analyseData").getOrCreate()
+    val sparkSession = SparkSession.builder().appName("analyseData").getOrCreate()
     val sparkContext = sparkSession.sparkContext
 
     sparkContext.setLogLevel("WARN")
@@ -21,21 +20,30 @@ object analyseData extends App {
     //per convertire RDD in DataFrame
     import sparkSession.implicits._
 
-    val inputFolderName = "/Users/marco/IdeaProjects/Wikipedia-Translation-Toolkit/file/datiFinali"
-    val sizeFolderName = "/Users/marco/IdeaProjects/Wikipedia-Translation-Toolkit/file/datiFinali/size"
+    /*
+    val inputFolderName = "C:\\Users\\nik_9\\Desktop\\prova\\datiFinali"
+    val outputFolderName  = "C:\\Users\\nik_9\\Desktop\\prova\\risultato"
+    val folderSeparator = "\\"
+    */
+
+    val inputFolderName   = "s3n://wtt-s3-1/datiFinali"
+    val outputFolderName  = "s3n://wtt-s3-1/risultato"
     val folderSeparator   = "/"
 
-    //dataFrame dai parquet inglesi
-    val dataFrameSrc = DataFrameUtility.dataFrameFromFoldersRecursively(Array(inputFolderName), "en", sparkSession)
-
-    //dataFrame dai parquet italiani
-    val dataFrameDst = DataFrameUtility.dataFrameFromFoldersRecursively(Array(inputFolderName), "it", sparkSession)
-
-    //dataframe delle dimensioni
-    var dataFrameSize = DataFrameUtility.dataFrameFromFoldersRecursively(Array(inputFolderName),"size", sparkSession)
 
     val startTime = System.currentTimeMillis()
 
+    //dataFrame dai parquet inglesi
+    //val dataFrameSrc = DataFrameUtility.dataFrameFromFoldersRecursively(Array(inputFolderName), "en", sparkSession)
+    val dataFrameSrc = sparkSession.read.parquet(inputFolderName + folderSeparator + "en" + folderSeparator + "part-00000-21358f3e-1fa2-43ed-a8ec-e373bd0add99-c000.snappy.parquet")
+
+    //dataFrame dai parquet italiani
+    //val dataFrameDst = DataFrameUtility.dataFrameFromFoldersRecursively(Array(inputFolderName), "it", sparkSession)
+    val dataFrameDst = sparkSession.read.parquet(inputFolderName + folderSeparator + "it" + folderSeparator + "part-00000-53dfa14b-55b2-42cd-bc23-8a557c4e976d-c000.snappy.parquet")
+
+    //dataframe delle dimensioni
+    //var dataFrameSize = DataFrameUtility.dataFrameFromFoldersRecursively(Array(inputFolderName),"size", sparkSession)
+    var dataFrameSize = sparkSession.read.parquet(inputFolderName + folderSeparator + "size" + folderSeparator + "part-00000-e6533178-ebae-4b84-9818-b23ff5e470e8-c000.snappy.parquet")
 
 
     // DF standard
@@ -51,6 +59,7 @@ object analyseData extends App {
 
     val sumLong_ = udf((xs: WA[Long]) => xs.sum.toInt)
     val sumInt_ = udf((xs: WA[Int]) => xs.sum)
+
 
 
     // Somma visualizzazioni anno
@@ -173,7 +182,6 @@ object analyseData extends App {
 
     //Aggiungiamo le pagine con link rotti
 
-    println("translateBonus_")
     dataFrameSize = dataFrameSize.withColumn("score", translateBonus_($"score", $"id_ita", $"byte_dim_page", $"byte_dim_page_tot", $"byte_dim_page_ita_original", $"id_traduzioni_redirect_dim")).sort(desc("score"))
     dataFrameSize.show(20, false)
 
@@ -182,6 +190,9 @@ object analyseData extends App {
     scoreDF = scoreDF.drop("score").join(dataFrameSize.select("id", "score"), Seq("id")).sort(desc("score"))
     scoreDF.show(20,false)
 
+
+    //FileUtils.deleteDirectory(new File(outputFolderName))
+    //scoreDF.repartition(DataFrameUtility.numPartitions).write.parquet(outputFolderName)
     //scoreDF.write.parquet(outputFolderName)
 
 

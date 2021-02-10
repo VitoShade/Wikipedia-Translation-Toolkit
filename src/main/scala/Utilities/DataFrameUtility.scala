@@ -12,7 +12,7 @@ package Utilities {
 
   object DataFrameUtility {
 
-    val numPartitions = 8
+    var numPartitions = 8
 
     def collectParquetFilesFromFolders(folders: Array[String]): Array[String] = {
 
@@ -39,15 +39,20 @@ package Utilities {
 
       queue ++= folders
 
+      println("queue " + queue)
+
       while(queue.nonEmpty) {
 
         val folder = new File(queue.dequeue())
 
-
+        println("folder " + folder)
 
         if(folder.toString.takeRight(subFolder.length) == subFolder) {
 
           val files = folder.listFiles.filter(file => file.isFile && (file.toString.takeRight(15) == ".snappy.parquet")).map(file => file.toString)
+
+          println("files ")
+          files.foreach(println(_))
 
           allParquetFiles = allParquetFiles ++ files
         }
@@ -57,12 +62,10 @@ package Utilities {
         queue ++= recursiveFolders
       }
 
-      val dataFrameFilesSrc = allParquetFiles map (tempFile => sparkSession.read.parquet(tempFile))
+      val dataFrameFiles = allParquetFiles map (tempFile => sparkSession.read.parquet(tempFile))
 
       //merge dei parquet in un dataFrame unico
-      val dataFrameSrc = dataFrameFilesSrc.reduce(_ union _)
-
-      dataFrameSrc
+      dataFrameFiles.reduce(_ union _)
     }
 
     def DEBUG_redirectDiRedirect(dataFrameSrc: DataFrame) {
