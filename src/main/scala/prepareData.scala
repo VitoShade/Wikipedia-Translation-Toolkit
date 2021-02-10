@@ -26,22 +26,22 @@ object prepareData extends App {
 
     //per convertire RDD in DataFrame
     import sparkSession.implicits._
-
+/*
     val inputFolderName   = "C:\\Users\\nik_9\\Desktop\\prova\\outputProcessati"
     val tempFolderName    = "C:\\Users\\nik_9\\Desktop\\prova\\tempOutput"
     val errorFolderName   = "C:\\Users\\nik_9\\Desktop\\prova\\tempOutput\\error"
     val outputFolderName  = "C:\\Users\\nik_9\\Desktop\\prova\\datiFinali"
     val sizeFolderName    = "C:\\Users\\nik_9\\Desktop\\prova\\datiFinali\\size"
     val folderSeparator   = "\\"
+*/
 
-    /*
     val inputFolderName   = "s3n://wtt-s3-1/downloaded/outputProcessati"
     val tempFolderName    = "s3n://wtt-s3-1/downloaded/tempOutput"
     val errorFolderName   = "s3n://wtt-s3-1/downloaded/tempOutput/error"
     val outputFolderName  = "s3n://wtt-s3-1/downloaded/datiFinali"
     val sizeFolderName    = "s3n://wtt-s3-1/downloaded/datiFinali/size"
     val folderSeparator   = "/"
-    */
+
 
     val startTime = System.currentTimeMillis()
 
