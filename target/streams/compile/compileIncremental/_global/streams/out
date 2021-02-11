@@ -2,27 +2,27 @@
 [debug] IncrementalCompile.incrementalCompile
 [debug] previous = Stamps for: 33 products, 6 sources, 8 libraries
 [debug] current source = Set(${BASE}/src/main/scala/API/API.scala, ${BASE}/src/main/scala/prepareData.scala, ${BASE}/src/main/scala/downloadData.scala, ${BASE}/src/main/scala/showData.scala, ${BASE}/src/main/scala/Utilities/DataFrameUtility.scala, ${BASE}/src/main/scala/analyseData.scala)
-[debug] > initialChanges = InitialChanges(Changes(added = Set(), removed = Set(), changed = Set(${BASE}/src/main/scala/analyseData.scala), unmodified = ...),Set(),Set(),API Changes: Set())
+[debug] > initialChanges = InitialChanges(Changes(added = Set(), removed = Set(), changed = Set(${BASE}/src/main/scala/showData.scala), unmodified = ...),Set(),Set(),API Changes: Set())
 [debug] 
 [debug] Initial source changes:
 [debug] 	removed: Set()
 [debug] 	added: Set()
-[debug] 	modified: Set(${BASE}/src/main/scala/analyseData.scala)
+[debug] 	modified: Set(${BASE}/src/main/scala/showData.scala)
 [debug] Invalidated products: Set()
 [debug] External API changes: API Changes: Set()
 [debug] Modified binary dependencies: Set()
-[debug] Initial directly invalidated classes: Set(analyseData)
+[debug] Initial directly invalidated classes: Set(showData)
 [debug] Sources indirectly invalidated by:
 [debug] 	product: Set()
 [debug] 	binary dep: Set()
 [debug] 	external source: Set()
-[debug] All initially invalidated classes: Set(analyseData)
-[debug] All initially invalidated sources:Set(${BASE}/src/main/scala/analyseData.scala)
-[debug] Initial set of included nodes: analyseData
+[debug] All initially invalidated classes: Set(showData)
+[debug] All initially invalidated sources:Set(${BASE}/src/main/scala/showData.scala)
+[debug] Initial set of included nodes: showData
 [debug] compilation cycle 1
 [info] compiling 1 Scala source to C:\Users\nik_9\IdeaProjects\Wikipedia-Translation-Toolkit\target\scala-2.12\classes ...
 [debug] Getting org.scala-sbt:compiler-bridge_2.12:1.4.4:compile for Scala 2.12.12
-[debug] [zinc] Running cached compiler 58c9e737 for Scala compiler version 2.12.12
+[debug] [zinc] Running cached compiler 24de6cdf for Scala compiler version 2.12.12
 [debug] [zinc] The Scala compiler is invoked with:
 [debug] 	-bootclasspath
 [debug] 	C:\Users\nik_9\.sbt\boot\scala-2.12.12\lib\scala-library.jar
@@ -34,5 +34,5 @@
 [debug] Final step, transitive dependencies:
 [debug] 	Set()
 [debug] No classes were invalidated.
-[debug] Scala compilation took 3.062889 s
+[debug] Scala compilation took 0.866449 s
 [info] done compiling
