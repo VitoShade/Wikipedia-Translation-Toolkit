@@ -10,9 +10,11 @@ object showData extends App {
     sparkContext.setLogLevel("WARN")
 
     val startTime = System.currentTimeMillis()
-
+/*
     val path = args(0)
     val dataFrames = args.drop(1) map (tempFile => sparkSession.read.parquet(path+tempFile))
+
+ */
 
     //val inputFile = sparkContext.textFile("file.txt").collect
 
@@ -23,9 +25,15 @@ object showData extends App {
     )*/
 
     //merge dei parquet in un dataFrame unico
-    val dataFrameTotal=dataFrames.reduce(_ union _)
+
+    /*
+    val dataFrameTotal = dataFrames.reduce(_ union _)
 
     dataFrameTotal.coalesce(1).write.parquet("s3n://wtt-s3-1/provaOutput")
+
+     */
+
+    sparkContext.parallelize(Array[String]("pippo", "pluto", "paperino")).coalesce(1).saveAsTextFile("s3n://wtt-s3-1/exp/fileSingolo.txt")
 
     val endTime = System.currentTimeMillis()
 

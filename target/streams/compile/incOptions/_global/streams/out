@@ -1,11 +1,46 @@
 [debug] Created transactional ClassFileManager with tempDir = C:\Users\nik_9\IdeaProjects\Wikipedia-Translation-Toolkit\target\scala-2.12\classes.bak
 [debug] About to delete class files:
-[debug] 	showData.class
+[debug] 	downloadData.class
+[debug] 	SparkHelper$RDDExtensions.class
+[debug] 	SparkHelper$.class
 [debug] 	showData$.class
+[debug] 	downloadData$$typecreator13$1.class
+[debug] 	DataFrameUtility$.class
+[debug] 	DataFrameUtility$$typecreator4$1.class
+[debug] 	DataFrameUtility.class
+[debug] 	downloadData$$typecreator5$1.class
+[debug] 	DataFrameUtility$$typecreator4$2.class
+[debug] 	DataFrameUtility$$typecreator9$1.class
+[debug] 	SparkHelper$RDDExtensions$.class
+[debug] 	SparkHelper.class
+[debug] 	showData.class
+[debug] 	downloadData$.class
 [debug] We backup class files:
-[debug] 	showData.class
+[debug] 	downloadData.class
+[debug] 	SparkHelper$RDDExtensions.class
+[debug] 	SparkHelper$.class
 [debug] 	showData$.class
+[debug] 	downloadData$$typecreator13$1.class
+[debug] 	DataFrameUtility$.class
+[debug] 	DataFrameUtility$$typecreator4$1.class
+[debug] 	DataFrameUtility.class
+[debug] 	downloadData$$typecreator5$1.class
+[debug] 	DataFrameUtility$$typecreator4$2.class
+[debug] 	DataFrameUtility$$typecreator9$1.class
+[debug] 	SparkHelper$RDDExtensions$.class
+[debug] 	SparkHelper.class
+[debug] 	showData.class
+[debug] 	downloadData$.class
 [debug] Registering generated classes:
-[debug] 	showData.class
+[debug] 	downloadData.class
 [debug] 	showData$.class
+[debug] 	downloadData$$typecreator13$1.class
+[debug] 	DataFrameUtility$.class
+[debug] 	DataFrameUtility$$typecreator4$1.class
+[debug] 	DataFrameUtility.class
+[debug] 	downloadData$$typecreator5$1.class
+[debug] 	DataFrameUtility$$typecreator4$2.class
+[debug] 	DataFrameUtility$$typecreator9$1.class
+[debug] 	showData.class
+[debug] 	downloadData$.class
 [debug] Removing the temporary directory used for backing up class files: C:\Users\nik_9\IdeaProjects\Wikipedia-Translation-Toolkit\target\scala-2.12\classes.bak

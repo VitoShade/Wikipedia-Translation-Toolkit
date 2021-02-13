@@ -2,16 +2,13 @@
 import org.apache.spark.sql.SparkSession
 import API._
 import Utilities._
-import org.apache.commons.io.FileUtils
-import java.io._
-import java.net.URLDecoder
-import java.nio.charset.StandardCharsets
+import java.net._
 
 object downloadData extends App {
   override def main(args: Array[String]) {
 
-    val sparkSession = SparkSession.builder().master("local[20]").appName("downloadData").getOrCreate()
-    //val sparkSession = SparkSession.builder().appName("downloadData").getOrCreate()
+    //val sparkSession = SparkSession.builder().master("local[20]").appName("downloadData").getOrCreate()
+    val sparkSession = SparkSession.builder().appName("downloadData").getOrCreate()
     val sparkContext = sparkSession.sparkContext
 
     //println("Working with " + DataFrameUtility.numPartitions + " partitions")
@@ -21,40 +18,48 @@ object downloadData extends App {
     //per convertire RDD in DataFrame
     import sparkSession.implicits._
 
+    /*
     val inputFolderName   = "C:\\Users\\nik_9\\Desktop\\prova\\indici"
     val tempFolderName    = "C:\\Users\\nik_9\\Desktop\\prova\\tempResult"
     val outputFolderName  = "C:\\Users\\nik_9\\Desktop\\prova\\result"
     val errorFolderName   = "C:\\Users\\nik_9\\Desktop\\prova\\result\\error"
     val folderSeparator   = "\\"
-
-    /*
-    val inputFolderName   = "s3n://wtt-s3-1/download/indici"
-    val tempFolderName    = "s3n://wtt-s3-1/download/tempResult"
-    val outputFolderName  = "s3n://wtt-s3-1/download/result"
-    val errorFolderName   = "s3n://wtt-s3-1/download/result/error"
-    val folderSeparator   = "/"
     */
+
+
+    //val inputFolderName   = "s3n://wtt-s3-1/download/indici"
+    val tempFolderName    = "s3n://wtt-s3-1/tempResult"
+    //val errorFolderName   = "s3n://wtt-s3-1/tempResult/error"
+    //val outputFolderName  = "s3n://wtt-s3-1/download/result"
+    //val errorFolderName   = "s3n://wtt-s3-1/download/result/error"
+    val folderSeparator   = "/"
+
 
     val startTime = System.currentTimeMillis()
 
-    val inputFolder = new File(inputFolderName)
+    //val inputFolder = new File(inputFolderName)
 
     //raccolta di tutti i file .txt nella cartella di input
-    val inputFiles = inputFolder.listFiles.filter(file => file.isFile && (file.toString.takeRight(4) == ".txt")).map(file => file.toString)
-    //val inputFiles = args
+    //val inputFiles = inputFolder.listFiles.filter(file => file.isFile && (file.toString.takeRight(4) == ".txt")).map(file => file.toString)
+    val path = args(0)
+    val inputFiles = args.drop(1)
+
+
 
     //var tempOutputFoldersSrc = Array[String]()
     //var tempOutputFoldersDst = Array[String]()
 
+    /*
     FileUtils.deleteDirectory(new File(tempFolderName))
     FileUtils.deleteDirectory(new File(outputFolderName))
     FileUtils.forceMkdir(new File(errorFolderName))
+    */
 
     //ciclo sui file nella cartella di input
     inputFiles.foreach(inputFileName => {
 
       //caricamento del file di input e divisione in task
-      val input = sparkContext.textFile(inputFileName, 60)
+      val input = sparkContext.textFile(path + inputFileName, 60)
 
       var counter = 0
 
@@ -71,7 +76,7 @@ object downloadData extends App {
 
         counter += 1
 
-        (line, tuple1._1, URLDecoder.decode(tuple1._2,  StandardCharsets.UTF_8), tuple2._1, tuple2._2, tuple3._1, tuple3._2)
+        (line, tuple1._1, URLDecoder.decode(tuple1._2,  "UTF-8"), tuple2._1, tuple2._2, tuple3._1, tuple3._2)
 
       }).persist
 
@@ -79,9 +84,10 @@ object downloadData extends App {
       val tempDataFrameSrc = tempResultSrc.toDF("id", "num_traduzioni", "id_pagina_tradotta", "num_visualiz_anno", "num_visualiz_mesi", "byte_dim_page", "id_redirect")
 
       //creazione di una cartella temporanea per il file appena processato
-      val tempOutputName = inputFileName.drop(inputFolderName.length + 1).dropRight(4)
+      val tempOutputName = inputFileName.dropRight(4)
 
-      val tempOutputFolderSrc = tempFolderName + folderSeparator + "en" + folderSeparator + tempOutputName
+      //"s3n://wtt-s3-1/tempResult"  "/" "fileXX"  "/" "en"
+      val tempOutputFolderSrc = tempFolderName + folderSeparator + tempOutputName + folderSeparator + "en"
 
       //salvataggio del nome della cartella temporanea
       //tempOutputFoldersSrc = tempOutputFoldersSrc :+ tempOutputFolderSrc
@@ -93,13 +99,15 @@ object downloadData extends App {
       tempDataFrameSrc.coalesce(1).write.parquet(tempOutputFolderSrc)
 
       //salvataggio degli errori per le API di en.wikipedia
-      DataFrameUtility.writeFileID(errorFolderName + folderSeparator + "errorLangLinks.txt", APILangLinks.obtainErrorID())
-      DataFrameUtility.writeFileID(errorFolderName + folderSeparator + "errorView.txt",      APIPageView.obtainErrorID())
-      DataFrameUtility.writeFileID(errorFolderName + folderSeparator + "errorRedirect.txt",  APIRedirect.obtainErrorID())
+      DataFrameUtility.writeFileID(tempFolderName + folderSeparator + tempOutputName + folderSeparator + "error" + folderSeparator + "errorLangLinks", APILangLinks.obtainErrorID(), sparkContext)
+      DataFrameUtility.writeFileID(tempFolderName + folderSeparator + tempOutputName + folderSeparator + "error" + folderSeparator + "errorView",      APIPageView.obtainErrorID(), sparkContext)
+      DataFrameUtility.writeFileID(tempFolderName + folderSeparator + tempOutputName + folderSeparator + "error" + folderSeparator + "errorRedirect",  APIRedirect.obtainErrorID(), sparkContext)
 
-      DataFrameUtility.writeFileErrors(errorFolderName + folderSeparator + "errorLangLinksDetails.txt", APILangLinks.obtainErrorDetails())
-      DataFrameUtility.writeFileErrors(errorFolderName + folderSeparator + "errorViewDetails.txt",      APIPageView.obtainErrorDetails())
-      DataFrameUtility.writeFileErrors(errorFolderName + folderSeparator + "errorRedirectDetails.txt",  APIRedirect.obtainErrorDetails())
+      /*
+      DataFrameUtility.writeFileErrors(tempFolderName + folderSeparator + tempOutputName + folderSeparator + "error" + folderSeparator + "errorLangLinksDetails.txt", APILangLinks.obtainErrorDetails())
+      DataFrameUtility.writeFileErrors(tempFolderName + folderSeparator + tempOutputName + folderSeparator + "error" + folderSeparator + "errorViewDetails.txt",      APIPageView.obtainErrorDetails())
+      DataFrameUtility.writeFileErrors(tempFolderName + folderSeparator + tempOutputName + folderSeparator + "error" + folderSeparator + "errorRedirectDetails.txt",  APIRedirect.obtainErrorDetails())
+      */
 
       //reset degli errori
       APILangLinks.resetErrorList()
@@ -127,14 +135,16 @@ object downloadData extends App {
 
         counter += 1
 
-        (line, URLDecoder.decode(tuple1._2,  StandardCharsets.UTF_8), tuple2._1, tuple2._2, tuple3._1, tuple3._2)
+        (line, URLDecoder.decode(tuple1._2,  "UTF-8"), tuple2._1, tuple2._2, tuple3._1, tuple3._2)
 
       }).persist
 
       //creazione del DataFrame per it.wikipedia
       val tempDataFrameDst = tempResultDst.toDF("id", "id_pagina_originale", "num_visualiz_anno", "num_visualiz_mesi", "byte_dim_page", "id_redirect")
 
-      val tempOutputFolderDst = tempFolderName + folderSeparator + "it" + folderSeparator + tempOutputName
+      //val tempOutputFolderDst = tempFolderName + folderSeparator + "it" + folderSeparator + tempOutputName
+      //"s3n://wtt-s3-1/tempResult"  "/" "fileXX"  "/" "it"
+      val tempOutputFolderDst = tempFolderName + folderSeparator + tempOutputName + folderSeparator + "it"
 
       //salvataggio del nome della cartella temporanea
       //tempOutputFoldersDst = tempOutputFoldersDst :+ tempOutputFolderDst
@@ -146,13 +156,15 @@ object downloadData extends App {
       tempDataFrameDst.coalesce(1).write.parquet(tempOutputFolderDst)
 
       //salvataggio degli errori per le API di it.wikipedia
-      DataFrameUtility.writeFileID(errorFolderName + folderSeparator + "errorLangLinksTranslated.txt", APILangLinks.obtainErrorID())
-      DataFrameUtility.writeFileID(errorFolderName + folderSeparator + "errorViewTranslated.txt",      APIPageView.obtainErrorID())
-      DataFrameUtility.writeFileID(errorFolderName + folderSeparator + "errorRedirectTranslated.txt",  APIRedirect.obtainErrorID())
+      DataFrameUtility.writeFileID(tempFolderName + folderSeparator + tempOutputName + folderSeparator + "error" + folderSeparator + "errorLangLinksTranslated", APILangLinks.obtainErrorID(), sparkContext)
+      DataFrameUtility.writeFileID(tempFolderName + folderSeparator + tempOutputName + folderSeparator + "error" + folderSeparator + "errorViewTranslated",      APIPageView.obtainErrorID(), sparkContext)
+      DataFrameUtility.writeFileID(tempFolderName + folderSeparator + tempOutputName + folderSeparator + "error" + folderSeparator + "errorRedirectTranslated",  APIRedirect.obtainErrorID(), sparkContext)
 
-      DataFrameUtility.writeFileErrors(errorFolderName + folderSeparator + "errorLangLinksTranslatedDetails.txt", APILangLinks.obtainErrorDetails())
-      DataFrameUtility.writeFileErrors(errorFolderName + folderSeparator + "errorViewTranslatedDetails.txt",      APIPageView.obtainErrorDetails())
-      DataFrameUtility.writeFileErrors(errorFolderName + folderSeparator + "errorRedirectTranslatedDetails.txt",  APIRedirect.obtainErrorDetails())
+      /*
+      DataFrameUtility.writeFileErrors(tempFolderName + folderSeparator + tempOutputName + folderSeparator + "error" + folderSeparator + "errorLangLinksTranslatedDetails.txt", APILangLinks.obtainErrorDetails())
+      DataFrameUtility.writeFileErrors(tempFolderName + folderSeparator + tempOutputName + folderSeparator + "error" + folderSeparator + "errorViewTranslatedDetails.txt",      APIPageView.obtainErrorDetails())
+      DataFrameUtility.writeFileErrors(tempFolderName + folderSeparator + tempOutputName + folderSeparator + "error" + folderSeparator + "errorRedirectTranslatedDetails.txt",  APIRedirect.obtainErrorDetails())
+      */
 
       //reset degli errori
       APILangLinks.resetErrorList()
@@ -160,6 +172,7 @@ object downloadData extends App {
       APIRedirect.resetErrorList()
 
     })
+
 
     //questa parte si potrebbe fare dopo
     /*

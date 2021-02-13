@@ -1,7 +1,7 @@
 import java.io.File
 import java.net.URLDecoder
 import java.nio.charset.StandardCharsets
-import API.{APILangLinks, APIPageView, APIRedirect}
+import API._
 import org.apache.spark.sql.{DataFrame, SparkSession}
 import Utilities._
 import org.apache.commons.io.FileUtils
@@ -170,6 +170,9 @@ object prepareData extends App {
   }
 
   def missingIDsDF(dataFrameDst: DataFrame, errorFolderName: String, folderSeparator: String, sparkSession: SparkSession) = {
+
+    val sparkContext = sparkSession.sparkContext
+
     import sparkSession.implicits._
 
     val idDF = dataFrameDst.select("id").rdd.map(_.getAs[String](0)).collect().toList
@@ -183,9 +186,9 @@ object prepareData extends App {
     }).toDF("id", "id_pagina_originale", "num_visualiz_anno", "num_visualiz_mesi", "byte_dim_page", "id_redirect")).persist
 
     //salvataggio degli errori per le API di it.wikipedia
-    DataFrameUtility.writeFileID(errorFolderName + folderSeparator + "errorLangLinksTranslated.txt", APILangLinks.obtainErrorID())
-    DataFrameUtility.writeFileID(errorFolderName + folderSeparator + "errorViewTranslated.txt",      APIPageView.obtainErrorID())
-    DataFrameUtility.writeFileID(errorFolderName + folderSeparator + "errorRedirectTranslated.txt",  APIRedirect.obtainErrorID())
+    DataFrameUtility.writeFileID(errorFolderName + folderSeparator + "errorLangLinksTranslated.txt", APILangLinks.obtainErrorID(), sparkContext)
+    DataFrameUtility.writeFileID(errorFolderName + folderSeparator + "errorViewTranslated.txt",      APIPageView.obtainErrorID(), sparkContext)
+    DataFrameUtility.writeFileID(errorFolderName + folderSeparator + "errorRedirectTranslated.txt",  APIRedirect.obtainErrorID(), sparkContext)
 
     DataFrameUtility.writeFileErrors(errorFolderName + folderSeparator + "errorLangLinksTranslatedDetails.txt", APILangLinks.obtainErrorDetails())
     DataFrameUtility.writeFileErrors(errorFolderName + folderSeparator + "errorViewTranslatedDetails.txt",      APIPageView.obtainErrorDetails())

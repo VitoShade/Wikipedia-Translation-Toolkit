@@ -5,8 +5,10 @@ import org.apache.spark.sql._
 import scalaj.http.Http
 import API.{APILangLinks, APIPageView, APIRedirect}
 import org.apache.commons.io.FileUtils
-import java.net.URLDecoder
+import java.net._
 import java.nio.charset.StandardCharsets
+import org.apache.spark.sql.SparkSession
+import org.apache.spark.SparkContext
 
 package Utilities {
 
@@ -161,6 +163,8 @@ package Utilities {
 
     def retryPagesWithErrorAndReplace(inputFolderName: String, outputFolderName: String, errorFolderName: String, folderSeparator: String, sparkSession: SparkSession): Unit = {
 
+      val sparkContext = sparkSession.sparkContext
+
       //per convertire RDD in DataFrame
       import sparkSession.implicits._
 
@@ -216,9 +220,9 @@ package Utilities {
       resultSrc.repartition(numPartitions).write.parquet(outputFolderName + folderSeparator + "en")
 
       //salvataggio degli errori per le API di en.wikipedia
-      this.writeFileID(errorFolderName + folderSeparator + "errorLangLinks.txt", APILangLinks.obtainErrorID())
-      this.writeFileID(errorFolderName + folderSeparator + "errorView.txt",      APIPageView.obtainErrorID())
-      this.writeFileID(errorFolderName + folderSeparator + "errorRedirect.txt",  APIRedirect.obtainErrorID())
+      this.writeFileID(errorFolderName + folderSeparator + "errorLangLinks.txt", APILangLinks.obtainErrorID(), sparkContext)
+      this.writeFileID(errorFolderName + folderSeparator + "errorView.txt",      APIPageView.obtainErrorID(), sparkContext)
+      this.writeFileID(errorFolderName + folderSeparator + "errorRedirect.txt",  APIRedirect.obtainErrorID(), sparkContext)
 
       this.writeFileErrors(errorFolderName + folderSeparator + "errorLangLinksDetails.txt", APILangLinks.obtainErrorDetails())
       this.writeFileErrors(errorFolderName + folderSeparator + "errorViewDetails.txt",      APIPageView.obtainErrorDetails())
@@ -283,9 +287,9 @@ package Utilities {
       resultDst.repartition(numPartitions).write.parquet(outputFolderName + folderSeparator + "it")
 
       //salvataggio degli errori per le API di it.wikipedia
-      this.writeFileID(errorFolderName + folderSeparator + "errorLangLinksTranslated.txt", APILangLinks.obtainErrorID())
-      this.writeFileID(errorFolderName + folderSeparator + "errorViewTranslated.txt",      APIPageView.obtainErrorID())
-      this.writeFileID(errorFolderName + folderSeparator + "errorRedirectTranslated.txt",  APIRedirect.obtainErrorID())
+      this.writeFileID(errorFolderName + folderSeparator + "errorLangLinksTranslated.txt", APILangLinks.obtainErrorID(), sparkContext)
+      this.writeFileID(errorFolderName + folderSeparator + "errorViewTranslated.txt",      APIPageView.obtainErrorID(), sparkContext)
+      this.writeFileID(errorFolderName + folderSeparator + "errorRedirectTranslated.txt",  APIRedirect.obtainErrorID(), sparkContext)
 
       this.writeFileErrors(errorFolderName + folderSeparator + "errorLangLinksTranslatedDetails.txt", APILangLinks.obtainErrorDetails())
       this.writeFileErrors(errorFolderName + folderSeparator + "errorViewTranslatedDetails.txt",      APIPageView.obtainErrorDetails())
@@ -368,12 +372,8 @@ package Utilities {
 
     }
 
-    def writeFileID(filePath: String, listID: Vector[String]): Unit = {
-      val file = new File(filePath)
-      if(!file.exists) file.createNewFile()
-      val bw = new BufferedWriter(new FileWriter(file, true))
-      listID.foreach( id => bw.write(id + "\n"))
-      bw.close()
+    def writeFileID(filePath: String, listID: Vector[String], sparkContext: SparkContext): Unit = {
+      sparkContext.parallelize(listID).coalesce(1).saveAsTextFile(filePath)
     }
 
     def writeFileErrors(filePath: String, listErrors: Vector[(String, Vector[(Int, String)])]): Unit = {

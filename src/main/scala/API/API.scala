@@ -1,5 +1,5 @@
 
-import java.net.{URLDecoder, URLEncoder}
+import java.net._
 import java.nio.charset.StandardCharsets
 import scalaj.http.Http
 
@@ -30,8 +30,8 @@ package API {
       //println(url + " pt1")
       while(!cond && (counter < 10)) {
         try {
-          result = Http("https://" + URLEncoder.encode(sourceLang, StandardCharsets.UTF_8) +
-            ".wikipedia.org/w/api.php?action=parse&page=" + URLEncoder.encode(url, StandardCharsets.UTF_8) + "&format=json&prop=langlinks"
+          result = Http("https://" + URLEncoder.encode(sourceLang, "UTF-8") +
+            ".wikipedia.org/w/api.php?action=parse&page=" + URLEncoder.encode(url, "UTF-8") + "&format=json&prop=langlinks"
           ).asString
           if (result.is2xx) {
             try {
@@ -92,8 +92,8 @@ package API {
       //println(url + " pt3")
       while(!cond && (counter <10)) {
         try {
-          result = Http("https://" + URLEncoder.encode(lang, StandardCharsets.UTF_8) +
-            ".wikipedia.org/w/api.php?action=parse&page=" + URLEncoder.encode(url, StandardCharsets.UTF_8) + "&prop=text&format=json").asString
+          result = Http("https://" + URLEncoder.encode(lang, "UTF-8") +
+            ".wikipedia.org/w/api.php?action=parse&page=" + URLEncoder.encode(url, "UTF-8") + "&prop=text&format=json").asString
           if(result.is2xx) {
             try {
               ret = this.parseJSON(result.body)
@@ -125,7 +125,7 @@ package API {
     def parseJSON(response: String): (Int, String) = {
       val json = ujson.read(response)
       val text = json("parse").obj("text").obj("*").str
-      val di_ref=if(text contains "class=\"redirectText\"" ) URLDecoder.decode(text.split("class=\"redirectText\"")(1).split("href=\"/wiki/")(1).split("\" title=\"")(0).split("#")(0), StandardCharsets.UTF_8) else ""
+      val di_ref=if(text contains "class=\"redirectText\"" ) URLDecoder.decode(text.split("class=\"redirectText\"")(1).split("href=\"/wiki/")(1).split("\" title=\"")(0).split("#")(0), "UTF-8") else ""
 
       (text.getBytes.length, di_ref)
     }
@@ -156,8 +156,8 @@ package API {
       //println(url + " pt2")
       while(!cond && (counter < 10)) {
         try {
-          result = Http("https://wikimedia.org/api/rest_v1/metrics/pageviews/per-article/" + URLEncoder.encode(lang, StandardCharsets.UTF_8) +
-            ".wikipedia/all-access/all-agents/" + URLEncoder.encode(url, StandardCharsets.UTF_8) + "/monthly/20180101/20210101").asString
+          result = Http("https://wikimedia.org/api/rest_v1/metrics/pageviews/per-article/" + URLEncoder.encode(lang, "UTF-8") +
+            ".wikipedia/all-access/all-agents/" + URLEncoder.encode(url, "UTF-8") + "/monthly/20180101/20210101").asString
 
           if (result.is2xx) {
             ret = this.parseJSON(result.body)
