@@ -15,6 +15,11 @@ object analyseData extends App {
     val sparkSession = SparkSession.builder().appName("analyseData").getOrCreate()
     val sparkContext = sparkSession.sparkContext
 
+    if(args.length > 0)
+      DataFrameUtility.numPartitions = args(0).toInt
+
+    println("Working with " + DataFrameUtility.numPartitions + " partitions")
+
     sparkContext.setLogLevel("WARN")
 
     //per convertire RDD in DataFrame
