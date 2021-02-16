@@ -5,19 +5,16 @@ import org.apache.spark.sql._
 import scalaj.http.Http
 import API.{APILangLinks, APIPageView, APIRedirect}
 import org.apache.commons.io.FileUtils
-import java.net.URLDecoder
+import java.net._
 import java.nio.charset.StandardCharsets
+import org.apache.spark.sql.SparkSession
+import org.apache.spark.SparkContext
 
 package Utilities {
 
   object DataFrameUtility {
 
-    val numPartitions = 8
-
-    def readParquetFromFoldersAndShow(folders: Array[String]): Array[String] = {
-      //collectParquetFilesFromFolders(folders)
-      Array()
-    }
+    var numPartitions = 8
 
     def collectParquetFilesFromFolders(folders: Array[String]): Array[String] = {
 
@@ -44,13 +41,20 @@ package Utilities {
 
       queue ++= folders
 
+      println("queue " + queue)
+
       while(queue.nonEmpty) {
 
         val folder = new File(queue.dequeue())
 
+        println("folder " + folder)
+
         if(folder.toString.takeRight(subFolder.length) == subFolder) {
 
           val files = folder.listFiles.filter(file => file.isFile && (file.toString.takeRight(15) == ".snappy.parquet")).map(file => file.toString)
+
+          println("files ")
+          files.foreach(println(_))
 
           allParquetFiles = allParquetFiles ++ files
         }
@@ -89,8 +93,8 @@ package Utilities {
       })
     }
 
-    def collectErrorPagesFromFoldersRecursively(folders: Array[String], sparkSession: SparkSession, translated: Boolean): Dataset[String] = {
-
+    def collectErrorPagesFromFoldersRecursively(errorFiles: Array[String], sparkSession: SparkSession): Dataset[String] = {
+      /*
       var errorFiles = Array[String]()
 
       var queue = new mutable.Queue[String]()
@@ -117,6 +121,8 @@ package Utilities {
         queue ++= recursiveFolders
       }
 
+
+       */
       val wikiPagesWithErrorRepetitions = errorFiles.map(x => {sparkSession.read.textFile(x)})
 
       val wikiPagesWithError = wikiPagesWithErrorRepetitions.reduce(_ union _).dropDuplicates()
@@ -157,7 +163,10 @@ package Utilities {
       wikiPagesWithError
     }
 
+    /*
     def retryPagesWithErrorAndReplace(inputFolderName: String, outputFolderName: String, errorFolderName: String, folderSeparator: String, sparkSession: SparkSession): Unit = {
+
+      val sparkContext = sparkSession.sparkContext
 
       //per convertire RDD in DataFrame
       import sparkSession.implicits._
@@ -198,6 +207,8 @@ package Utilities {
 
       }).repartition(numPartitions)
 
+
+
       //creazione del DataFrame per en.wikipedia
       val tempDataFrameSrc = tempResultSrc.toDF("id", "num_traduzioni", "id_pagina_tradotta", "num_visualiz_anno", "num_visualiz_mesi", "byte_dim_page", "id_redirect")
 
@@ -214,9 +225,9 @@ package Utilities {
       resultSrc.repartition(numPartitions).write.parquet(outputFolderName + folderSeparator + "en")
 
       //salvataggio degli errori per le API di en.wikipedia
-      this.writeFileID(errorFolderName + folderSeparator + "errorLangLinks.txt", APILangLinks.obtainErrorID())
-      this.writeFileID(errorFolderName + folderSeparator + "errorView.txt",      APIPageView.obtainErrorID())
-      this.writeFileID(errorFolderName + folderSeparator + "errorRedirect.txt",  APIRedirect.obtainErrorID())
+      this.writeFileID(errorFolderName + folderSeparator + "errorLangLinks.txt", APILangLinks.obtainErrorID(), sparkContext)
+      this.writeFileID(errorFolderName + folderSeparator + "errorView.txt",      APIPageView.obtainErrorID(), sparkContext)
+      this.writeFileID(errorFolderName + folderSeparator + "errorRedirect.txt",  APIRedirect.obtainErrorID(), sparkContext)
 
       this.writeFileErrors(errorFolderName + folderSeparator + "errorLangLinksDetails.txt", APILangLinks.obtainErrorDetails())
       this.writeFileErrors(errorFolderName + folderSeparator + "errorViewDetails.txt",      APIPageView.obtainErrorDetails())
@@ -281,15 +292,17 @@ package Utilities {
       resultDst.repartition(numPartitions).write.parquet(outputFolderName + folderSeparator + "it")
 
       //salvataggio degli errori per le API di it.wikipedia
-      this.writeFileID(errorFolderName + folderSeparator + "errorLangLinksTranslated.txt", APILangLinks.obtainErrorID())
-      this.writeFileID(errorFolderName + folderSeparator + "errorViewTranslated.txt",      APIPageView.obtainErrorID())
-      this.writeFileID(errorFolderName + folderSeparator + "errorRedirectTranslated.txt",  APIRedirect.obtainErrorID())
+      this.writeFileID(errorFolderName + folderSeparator + "errorLangLinksTranslated.txt", APILangLinks.obtainErrorID(), sparkContext)
+      this.writeFileID(errorFolderName + folderSeparator + "errorViewTranslated.txt",      APIPageView.obtainErrorID(), sparkContext)
+      this.writeFileID(errorFolderName + folderSeparator + "errorRedirectTranslated.txt",  APIRedirect.obtainErrorID(), sparkContext)
 
       this.writeFileErrors(errorFolderName + folderSeparator + "errorLangLinksTranslatedDetails.txt", APILangLinks.obtainErrorDetails())
       this.writeFileErrors(errorFolderName + folderSeparator + "errorViewTranslatedDetails.txt",      APIPageView.obtainErrorDetails())
       this.writeFileErrors(errorFolderName + folderSeparator + "errorRedirectTranslatedDetails.txt",  APIRedirect.obtainErrorDetails())
 
     }
+
+     */
 
     def DEBUG_newDataFrame(inputFolderName: Array[String], sparkSession: SparkSession): Unit = {
       //per convertire RDD in DataFrame
@@ -366,12 +379,8 @@ package Utilities {
 
     }
 
-    def writeFileID(filePath: String, listID: Vector[String]): Unit = {
-      val file = new File(filePath)
-      if(!file.exists) file.createNewFile()
-      val bw = new BufferedWriter(new FileWriter(file, true))
-      listID.foreach( id => bw.write(id + "\n"))
-      bw.close()
+    def writeFileID(filePath: String, listID: Vector[String], sparkContext: SparkContext): Unit = {
+      sparkContext.parallelize(listID).coalesce(1).saveAsTextFile(filePath)
     }
 
     def writeFileErrors(filePath: String, listErrors: Vector[(String, Vector[(Int, String)])]): Unit = {

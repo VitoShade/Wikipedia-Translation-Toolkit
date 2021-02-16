@@ -1,12 +1,8 @@
-import java.io.File
 import java.net.URLDecoder
-import java.nio.charset.StandardCharsets
-import API.{APILangLinks, APIPageView, APIRedirect}
+import API._
 import org.apache.spark.sql.{DataFrame, SparkSession}
 import Utilities._
-import org.apache.commons.io.FileUtils
 import org.apache.spark.sql.functions.{col, collect_set, sum, udf, when}
-
 import scala.collection.mutable
 import scala.collection.mutable.{WrappedArray => WA}
 
@@ -14,23 +10,32 @@ import scala.collection.mutable.{WrappedArray => WA}
 object prepareData extends App {
   override def main(args: Array[String]) {
 
-    val sparkSession = SparkSession.builder().master("local[16]").appName("prepareData").getOrCreate()
+    val sparkSession = SparkSession.builder().appName("prepareData").getOrCreate()
     val sparkContext = sparkSession.sparkContext
-
     sparkContext.setLogLevel("WARN")
 
     //per convertire RDD in DataFrame
     import sparkSession.implicits._
 
-    val inputFolderName  = "/Users/stefano/IdeaProjects/Wikipedia-Translation-Toolkit/src/main/files/outputProcessati"
-    val tempFolderName   = "/Users/stefano/IdeaProjects/Wikipedia-Translation-Toolkit/src/main/files/tempOutput"
-
-    val outputFolderName = "/Users/stefano/IdeaProjects/Wikipedia-Translation-Toolkit/src/main/files/datiFinali"
-    val errorFolderName  = "/Users/stefano/IdeaProjects/Wikipedia-Translation-Toolkit/src/main/files/tempOutput/error"
-    val sizeFolderName   = "/Users/stefano/IdeaProjects/Wikipedia-Translation-Toolkit/src/main/files/datiFinali/size"
-    val folderSeparator  = "/"
-
     val startTime = System.currentTimeMillis()
+
+    //raccolta di tutti i file .txt nella cartella di input
+    val nFile = args.drop(1).size
+    val bucket = args(0)
+
+    val errorFolderName   = bucket + "error/"
+    val folderSeparator   = "/"
+    val outputFolderName  = bucket + "datiFinali/"
+    val outputErrorFolderName  = bucket + "datiFinali/error/"
+    val sizeFolderName    = bucket + "datiFinali/size/"
+
+    // Unione dei DataFrame dai parquet inglesi
+    val dataFramesEn = args.slice(1, nFile/2+1) map (tempFile => sparkSession.read.parquet(bucket + tempFile))
+    val dataFrameSrc = dataFramesEn.reduce(_ union _)
+
+    // Unione dei DataFrame italiani
+    val dataFramesIt = args.slice(nFile/2+1, nFile+1) map (tempFile => sparkSession.read.parquet(bucket + tempFile))
+    var dataFrameDst = dataFramesIt.reduce(_ union _)
 
     // Retry errori durante downloadData e pulizia link a pagine italiane
     /*FileUtils.deleteDirectory(new File(errorFolderName))
@@ -41,28 +46,17 @@ object prepareData extends App {
     APIPageView.resetErrorList()
     APIRedirect.resetErrorList()
 
-    // DataFrame dai parquet inglesi
-    val dataFrameSrc = DataFrameUtility.dataFrameFromFoldersRecursively(Array(tempFolderName), "en", sparkSession)
-
     // Compressione dataframe da tradurre (togliendo redirect)
-    val compressedSrc = compressRedirect(dataFrameSrc, sparkSession).repartition(DataFrameUtility.numPartitions)
-
-    // DataFrame dai parquet italiani
-    var dataFrameDst = DataFrameUtility.dataFrameFromFoldersRecursively(Array(tempFolderName), "it", sparkSession).dropDuplicates().repartition(DataFrameUtility.numPartitions)
+    val compressedSrc = compressRedirect(dataFrameSrc, sparkSession)//.repartition(DataFrameUtility.numPartitions)
 
     // Chiamata per scaricare pagine italiane che si ottengono tramite redirect
-    dataFrameDst = missingIDsDF(dataFrameDst, errorFolderName, folderSeparator, sparkSession).dropDuplicates().repartition(DataFrameUtility.numPartitions)
+    dataFrameDst = missingIDsDF(dataFrameDst, outputErrorFolderName, sparkSession).dropDuplicates()//.repartition(DataFrameUtility.numPartitions)
 
     // Cancellazione pagine con errori
-    val (resultDataFrameSrc, resultDataFrameDst) = removeErrorPages(compressedSrc, dataFrameDst, sparkSession, tempFolderName)
+    val (resultDataFrameSrc, resultDataFrameDst) = removeErrorPages(compressedSrc, dataFrameDst, sparkSession, errorFolderName)
 
     // Creazione DataFrame dimensioni
     val dimPageDF = makeDimDF(resultDataFrameSrc, resultDataFrameDst, sparkSession)
-
-    // Pulizia directory
-    FileUtils.deleteDirectory(new File(outputFolderName + folderSeparator + "en"))
-    FileUtils.deleteDirectory(new File(outputFolderName + folderSeparator + "it"))
-    FileUtils.deleteDirectory(new File(sizeFolderName))
 
     resultDataFrameSrc.coalesce(1).write.parquet(outputFolderName + folderSeparator + "en")
     resultDataFrameDst.coalesce(1).write.parquet(outputFolderName + folderSeparator + "it")
@@ -134,6 +128,7 @@ object prepareData extends App {
         collect_set(when(!(col("id_pagina_tradotta") === ""), col("id_pagina_tradotta"))).as("id_traduzioni_redirect")
       ).withColumnRenamed("id_redirect","id")
 
+
     //somma del numero di visualizzazioni delle redirect alle pagine principali
     explodedSrc.filter("id_redirect == ''")
       .join(redirectSrc, Seq("id"), "left_outer")
@@ -146,9 +141,11 @@ object prepareData extends App {
         if(row.getAs[WA[String]](35) != null) row.getAs[WA[String]](35) else WA.empty[String]
       )
       ).toDF("id", "num_traduzioni", "id_pagina_tradotta", "num_visualiz_anno", "num_visualiz_mesi", "byte_dim_page", "id_traduzioni_redirect")
+
   }
 
-  def missingIDsDF(dataFrameDst: DataFrame, errorFolderName: String, folderSeparator: String, sparkSession: SparkSession) = {
+  def missingIDsDF(dataFrameDst: DataFrame, errorFolderName: String, sparkSession: SparkSession) = {
+    val sparkContext = sparkSession.sparkContext
     import sparkSession.implicits._
 
     val idDF = dataFrameDst.select("id").rdd.map(_.getAs[String](0)).collect().toList
@@ -158,24 +155,23 @@ object prepareData extends App {
       val tuple2 = APIPageView.callAPI(line.getAs[String](0), "it")
       val tuple3 = APIRedirect.callAPI(line.getAs[String](0), "it")
 
-      (line.getAs[String](0), URLDecoder.decode(tuple1._2,  StandardCharsets.UTF_8), tuple2._1, tuple2._2, tuple3._1, tuple3._2)
+      (line.getAs[String](0), URLDecoder.decode(tuple1._2,  "UTF-8"), tuple2._1, tuple2._2, tuple3._1, tuple3._2)
     }).toDF("id", "id_pagina_originale", "num_visualiz_anno", "num_visualiz_mesi", "byte_dim_page", "id_redirect")).persist
 
     //salvataggio degli errori per le API di it.wikipedia
-    DataFrameUtility.writeFileID(errorFolderName + folderSeparator + "errorLangLinksTranslated.txt", APILangLinks.obtainErrorID())
-    DataFrameUtility.writeFileID(errorFolderName + folderSeparator + "errorViewTranslated.txt",      APIPageView.obtainErrorID())
-    DataFrameUtility.writeFileID(errorFolderName + folderSeparator + "errorRedirectTranslated.txt",  APIRedirect.obtainErrorID())
-
-    DataFrameUtility.writeFileErrors(errorFolderName + folderSeparator + "errorLangLinksTranslatedDetails.txt", APILangLinks.obtainErrorDetails())
-    DataFrameUtility.writeFileErrors(errorFolderName + folderSeparator + "errorViewTranslatedDetails.txt",      APIPageView.obtainErrorDetails())
-    DataFrameUtility.writeFileErrors(errorFolderName + folderSeparator + "errorRedirectTranslatedDetails.txt",  APIRedirect.obtainErrorDetails())
+    DataFrameUtility.writeFileID(errorFolderName + "errorLangLinksMissingIDsDF", APILangLinks.obtainErrorID(), sparkContext)
+    DataFrameUtility.writeFileID(errorFolderName + "errorViewMissingIDsDF",      APIPageView.obtainErrorID(), sparkContext)
+    DataFrameUtility.writeFileID(errorFolderName + "errorRedirectMissingIDsDF",  APIRedirect.obtainErrorID(), sparkContext)
 
     dataFrame
   }
 
-  def removeErrorPages(compressedSrc: DataFrame, dataFrameDst:DataFrame, sparkSession: SparkSession, tempFolderName: String ) = {
+  def removeErrorPages(compressedSrc: DataFrame, dataFrameDst:DataFrame, sparkSession: SparkSession, bucket: String ) = {
+    val errorSrcFiles = Array("errorLangLinks.txt", "errorView.txt", "errorRedirect.txt" )
+    val errorDstFiles = Array("errorLangLinksTranslated.txt", "errorViewTranslated.txt", "errorRedirectTranslated.txt" )
+
     //pagine inglesi che hanno avuto errori con le API
-    val errorPagesSrc = DataFrameUtility.collectErrorPagesFromFoldersRecursively(Array(tempFolderName), sparkSession, false).toDF("id2")
+    val errorPagesSrc = DataFrameUtility.collectErrorPagesFromFoldersRecursively(errorSrcFiles.map (x => bucket + x), sparkSession).toDF("id2")
 
     //sottoinsieme delle pagine inglesi compresse che hanno avuto problemi
     val joinedCompressedSrc = compressedSrc.join(errorPagesSrc, compressedSrc("id") === errorPagesSrc("id2"), "inner").
@@ -185,7 +181,7 @@ object prepareData extends App {
     val resultDataFrameSrc = compressedSrc.except(joinedCompressedSrc)
 
     //pagine italiane che hanno avuto errori con le API
-    val errorPagesDst = DataFrameUtility.collectErrorPagesFromFoldersRecursively(Array(tempFolderName), sparkSession, true).toDF("id2")
+    val errorPagesDst = DataFrameUtility.collectErrorPagesFromFoldersRecursively(errorDstFiles.map (x => bucket + x), sparkSession).toDF("id2")
 
     //sottoinsieme delle pagine italiane compresse che hanno avuto problemi
     val joinedCompressedDst = dataFrameDst.join(errorPagesDst, dataFrameDst("id") === errorPagesDst("id2"), "inner").
@@ -194,7 +190,10 @@ object prepareData extends App {
     //rimozione dalle pagine compresse di quelle con errori
     val resultDataFrameDst = dataFrameDst.except(joinedCompressedDst)
 
-    (resultDataFrameSrc.repartition(DataFrameUtility.numPartitions), resultDataFrameDst.repartition(DataFrameUtility.numPartitions))
+    (resultDataFrameSrc //.repartition(DataFrameUtility.numPartitions)
+      ,
+      resultDataFrameDst//.repartition(DataFrameUtility.numPartitions)
+    )
   }
 
   def makeDimDF(mainDF: DataFrame, transDF: DataFrame, sparkSession: SparkSession) = {
@@ -223,7 +222,7 @@ object prepareData extends App {
       .sum("byte_dim_page")
       .withColumnRenamed("sum(byte_dim_page)","byte_dim_page_tot")
       .withColumnRenamed("id_ita", "id_ita2")
-      .repartition(DataFrameUtility.numPartitions)
+      //.repartition(DataFrameUtility.numPartitions)
 
     res.join(sumDF, res("id_ita") === sumDF("id_ita2")).drop("id_ita2")
   }
