@@ -41,20 +41,13 @@ package Utilities {
 
       queue ++= folders
 
-      println("queue " + queue)
-
       while(queue.nonEmpty) {
 
         val folder = new File(queue.dequeue())
 
-        println("folder " + folder)
-
         if(folder.toString.takeRight(subFolder.length) == subFolder) {
 
           val files = folder.listFiles.filter(file => file.isFile && (file.toString.takeRight(15) == ".snappy.parquet")).map(file => file.toString)
-
-          println("files ")
-          files.foreach(println(_))
 
           allParquetFiles = allParquetFiles ++ files
         }
@@ -93,8 +86,8 @@ package Utilities {
       })
     }
 
-    def collectErrorPagesFromFoldersRecursively(folders: Array[String], sparkSession: SparkSession, translated: Boolean): Dataset[String] = {
-
+    def collectErrorPagesFromFoldersRecursively(errorFiles: Array[String], sparkSession: SparkSession): Dataset[String] = {
+      /*
       var errorFiles = Array[String]()
 
       var queue = new mutable.Queue[String]()
@@ -121,6 +114,8 @@ package Utilities {
         queue ++= recursiveFolders
       }
 
+
+       */
       val wikiPagesWithErrorRepetitions = errorFiles.map(x => {sparkSession.read.textFile(x)})
 
       val wikiPagesWithError = wikiPagesWithErrorRepetitions.reduce(_ union _).dropDuplicates()
@@ -174,7 +169,7 @@ package Utilities {
       //dataFrame dai parquet inglesi
       val dataFrameSrc = this.dataFrameFromFoldersRecursively(Array(inputFolderName), "en", sparkSession)
 
-      val errorPagesSrc = this.collectErrorPagesFromFoldersRecursively(Array(inputFolderName), sparkSession, false).toDF("id2")
+      val errorPagesSrc = this.collectErrorPagesFromFoldersRecursively(Array(inputFolderName), sparkSession).toDF("id2")
 
       var counter = 0
 
@@ -239,7 +234,7 @@ package Utilities {
       //dataFrame dei parquet italiani
       val dataFrameDst = this.dataFrameFromFoldersRecursively(Array(inputFolderName), "it", sparkSession)
 
-      var errorPagesDst = this.collectErrorPagesFromFoldersRecursively(Array(inputFolderName), sparkSession, true).toDF("id2")
+      var errorPagesDst = this.collectErrorPagesFromFoldersRecursively(Array(inputFolderName), sparkSession).toDF("id2")
 
       errorPagesDst = errorPagesDst.union(newDstPages)
 
