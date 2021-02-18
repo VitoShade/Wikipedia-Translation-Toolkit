@@ -156,9 +156,9 @@ package Utilities {
       wikiPagesWithError
     }
 
-    def retryPagesWithErrorAndReplace(dataFrameSrc: DataFrame, dataFrameDst: DataFrame, errorPagesSrc: DataFrame, errorPagesDst: DataFrame, sparkSession: SparkSession) = {
+    def retryPagesWithErrorAndReplace(dataFrameSrc: DataFrame, dataFrameDst: DataFrame, errorPagesSrc: DataFrame, errorPagesDst: DataFrame, sparkSession: SparkSession): (DataFrame, DataFrame, DataFrame, DataFrame) = {
 
-      val sparkContext = sparkSession.sparkContext
+      //val sparkContext = sparkSession.sparkContext
 
       //per convertire RDD in DataFrame
       import sparkSession.implicits._
@@ -198,7 +198,7 @@ package Utilities {
 
         counter += 1
 
-        (line, tuple1._1, URLDecoder.decode(tuple1._2,  "UTF-8"), tuple2._1, tuple2._2, tuple3._1, tuple3._2)
+        (line, tuple1._1, URLDecoder.decode(tuple1._2, "UTF-8"), tuple2._1, tuple2._2, tuple3._1, tuple3._2)
 
       })//.repartition(numPartitions)
 

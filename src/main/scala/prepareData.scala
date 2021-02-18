@@ -47,14 +47,14 @@ object prepareData extends App {
     var errorPagesSrc = sparkSession.read.textFile(errorFolderName + "errors.txt").toDF("id2")
     var errorPagesDst = sparkSession.read.textFile(errorFolderName + "errorsTranslated.txt").toDF("id2")
 
-    /*
+
     val (resultSrc1, errorSrc1, resultDst1, errorDst1) = DataFrameUtility.retryPagesWithErrorAndReplace(dataFrameSrc, dataFrameDst, errorPagesSrc, errorPagesDst, sparkSession)
 
     dataFrameSrc = resultSrc1
     errorPagesSrc = errorSrc1
     dataFrameDst = resultDst1
     errorPagesDst = errorDst1
-    */
+
 
 
     APILangLinks.resetErrorList()
@@ -72,7 +72,7 @@ object prepareData extends App {
     val errorMissingID = errorMissingIDDuplicates.reduce(_ union _).dropDuplicates().toDF("id2")
 
     // Cancellazione pagine con errori
-    val (resultDataFrameSrc, resultDataFrameDst) = removeErrorPages(compressedSrc, dataFrameDst, errorMissingID, sparkSession, errorPagesSrc, errorPagesDst)
+    val (resultDataFrameSrc, resultDataFrameDst) = removeErrorPages(compressedSrc, dataFrameDst, errorMissingID, errorPagesSrc, errorPagesDst)
 
     // Creazione DataFrame dimensioni
     val dimPageDF = makeDimDF(resultDataFrameSrc, resultDataFrameDst, sparkSession)
@@ -170,7 +170,7 @@ object prepareData extends App {
 
     val idDF = dataFrameDst.select("id").rdd.map(_.getAs[String](0)).collect().toList
 
-    val dataFrame = dataFrameDst.union(dataFrameDst.filter(!(col("id_redirect") === "") && !(col("id_redirect").isin(idDF: _*))).select("id_redirect").map(line => {
+    val dataFrame = dataFrameDst.union(dataFrameDst.filter(!(col("id_redirect") === "") && !col("id_redirect").isin(idDF: _*)).select("id_redirect").map(line => {
       val tuple1 = APILangLinks.callAPI(line.getAs[String](0), "it", "en")
       val tuple2 = APIPageView.callAPI(line.getAs[String](0), "it")
       val tuple3 = APIRedirect.callAPI(line.getAs[String](0), "it")
@@ -186,13 +186,13 @@ object prepareData extends App {
     dataFrame
   }
 
-  def removeErrorPages(compressedSrc: DataFrame, dataFrameDst: DataFrame, errorMissingID: DataFrame, sparkSession: SparkSession, errorPagesSrc: DataFrame, errorPagesDst: DataFrame) = {
+  def removeErrorPages(compressedSrc: DataFrame, dataFrameDst: DataFrame, errorMissingID: DataFrame, errorPagesSrc: DataFrame, errorPagesDst: DataFrame) = {
 
     //val errorSrcFiles = Array("errorLangLinks.txt", "errorView.txt", "errorRedirect.txt")
     //val errorDstFiles = Array("errorLangLinksTranslated.txt", "errorViewTranslated.txt", "errorRedirectTranslated.txt")
 
-    val errorSrcFile = "errors.txt"
-    val errorDstFile = "errorsTranslated.txt"
+    //val errorSrcFile = "errors.txt"
+    //val errorDstFile = "errorsTranslated.txt"
 
     //pagine inglesi che hanno avuto errori con le API
     //val errorPagesSrc = sparkSession.read.textFile(errorFolderName + errorSrcFile).toDF("id2")
@@ -203,7 +203,7 @@ object prepareData extends App {
       select("id", "num_traduzioni", "id_pagina_tradotta", "num_visualiz_anno", "num_visualiz_mesi", "byte_dim_page", "id_traduzioni_redirect")
 
     //rimozione dalle pagine compresse di quelle con errori
-    val resultDataFrameSrc = compressedSrc.except(joinedCompressedSrc)
+    val resultDataFrameSrc = compressedSrc.except(joinedCompressedSrc).toDF("id", "num_traduzioni", "id_pagina_tradotta", "num_visualiz_anno", "num_visualiz_mesi", "byte_dim_page", "id_traduzioni_redirect")
 
     //pagine italiane che hanno avuto errori con le API
     //var errorPagesDst = sparkSession.read.textFile(errorFolderName + errorDstFile).toDF("id2")
@@ -217,7 +217,7 @@ object prepareData extends App {
       select("id", "id_pagina_originale", "num_visualiz_anno", "num_visualiz_mesi", "byte_dim_page", "id_redirect")
 
     //rimozione dalle pagine compresse di quelle con errori
-    val resultDataFrameDst = dataFrameDst.except(joinedCompressedDst)
+    val resultDataFrameDst = dataFrameDst.except(joinedCompressedDst).toDF("id", "id_pagina_originale", "num_visualiz_anno", "num_visualiz_mesi", "byte_dim_page", "id_redirect")
 
     (resultDataFrameSrc, resultDataFrameDst)
   }
