@@ -10,7 +10,7 @@ import scala.collection.mutable.{WrappedArray => WA}
 object prepareData extends App {
   override def main(args: Array[String]) {
 
-    val sparkSession = SparkSession.builder().appName("prepareData").getOrCreate()
+    val sparkSession = SparkSession.builder().master("local[4]").appName("prepareData").getOrCreate()
     val sparkContext = sparkSession.sparkContext
     sparkContext.setLogLevel("WARN")
 
@@ -24,11 +24,11 @@ object prepareData extends App {
     val bucket = args(0)
 
 
-    val errorFolderName   = bucket + "error/"
+    val errorFolderName   = bucket + "error\\"
     //val folderSeparator   = "/"
-    val outputFolderName  = bucket + "datiFinali/"
+    val outputFolderName  = bucket + "datiFinali\\"
     //val outputErrorFolderName  = bucket + "datiFinali/error/"
-    val sizeFolderName    = bucket + "datiFinali/size/"
+    val sizeFolderName    = bucket + "datiFinali\\size\\"
 
     // Unione dei DataFrame dai parquet inglesi
     val dataFramesEn = args.slice(1, nFile/2+1) map (tempFile => sparkSession.read.parquet(bucket + tempFile))
@@ -99,34 +99,33 @@ object prepareData extends App {
   def compressRedirect(dataFrameSrc: DataFrame, sparkSession: SparkSession) = {
     import sparkSession.implicits._
 
-    val explodedSrc = dataFrameSrc.select("id", "num_traduzioni", "id_redirect", "id_pagina_tradotta","num_visualiz_anno", "num_visualiz_mesi", "byte_dim_page")
+    val explodedSrc = dataFrameSrc.select("id", "num_traduzioni", "id_pagina_tradotta", "num_visualiz_anno", "num_visualiz_mesi", "byte_dim_page", "id_redirect")
       .map(row => ( row.getAs[String](0),
         row.getAs[Int](1),
+        row.getAs[String](6),
         row.getAs[String](2),
-        row.getAs[String](3),
+        row.getAs[WA[Int]](3)(0),
+        row.getAs[WA[Int]](3)(1),
+        row.getAs[WA[Int]](3)(2),
         row.getAs[WA[Int]](4)(0),
         row.getAs[WA[Int]](4)(1),
         row.getAs[WA[Int]](4)(2),
-        row.getAs[WA[Int]](5)(0),
-        row.getAs[WA[Int]](5)(1),
-        row.getAs[WA[Int]](5)(2),
-        row.getAs[WA[Int]](5)(3),
-        row.getAs[WA[Int]](5)(4),
-        row.getAs[WA[Int]](5)(5),
-        row.getAs[WA[Int]](5)(6),
-        row.getAs[WA[Int]](5)(7),
-        row.getAs[WA[Int]](5)(8),
-        row.getAs[WA[Int]](5)(9),
-        row.getAs[WA[Int]](5)(10),
-        row.getAs[WA[Int]](5)(11),
-        row.getAs[Int](6)
+        row.getAs[WA[Int]](4)(3),
+        row.getAs[WA[Int]](4)(4),
+        row.getAs[WA[Int]](4)(5),
+        row.getAs[WA[Int]](4)(6),
+        row.getAs[WA[Int]](4)(7),
+        row.getAs[WA[Int]](4)(8),
+        row.getAs[WA[Int]](4)(9),
+        row.getAs[WA[Int]](4)(10),
+        row.getAs[WA[Int]](4)(11),
+        row.getAs[Int](5)
       )
       ).toDF("id", "num_traduzioni", "id_redirect", "id_pagina_tradotta", "num_visualiz_anno1", "num_visualiz_anno2", "num_visualiz_anno3", "num_visualiz_mesi1", "num_visualiz_mesi2","num_visualiz_mesi3","num_visualiz_mesi4","num_visualiz_mesi5","num_visualiz_mesi6","num_visualiz_mesi7","num_visualiz_mesi8","num_visualiz_mesi9","num_visualiz_mesi10","num_visualiz_mesi11","num_visualiz_mesi12","byte_dim_page")
 
     //somma del numero di visualizzazioni per pagine che sono redirect
     val redirectSrc = explodedSrc.filter("id_redirect != ''")
-      .drop("num_traduzioni")
-      .drop("byte_dim_page")
+      .drop("num_traduzioni", "byte_dim_page")
       .groupBy("id_redirect")
       .agg(
         sum($"num_visualiz_anno1"),
@@ -203,7 +202,7 @@ object prepareData extends App {
       select("id", "num_traduzioni", "id_pagina_tradotta", "num_visualiz_anno", "num_visualiz_mesi", "byte_dim_page", "id_traduzioni_redirect")
 
     //rimozione dalle pagine compresse di quelle con errori
-    val resultDataFrameSrc = compressedSrc.except(joinedCompressedSrc).toDF("id", "num_traduzioni", "id_pagina_tradotta", "num_visualiz_anno", "num_visualiz_mesi", "byte_dim_page", "id_traduzioni_redirect")
+    val resultDataFrameSrc = compressedSrc.except(joinedCompressedSrc)//.toDF("id", "num_traduzioni", "id_pagina_tradotta", "num_visualiz_anno", "num_visualiz_mesi", "byte_dim_page", "id_traduzioni_redirect")
 
     //pagine italiane che hanno avuto errori con le API
     //var errorPagesDst = sparkSession.read.textFile(errorFolderName + errorDstFile).toDF("id2")
