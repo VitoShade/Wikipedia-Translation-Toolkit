@@ -156,20 +156,23 @@ package Utilities {
       wikiPagesWithError
     }
 
-    def retryPagesWithErrorAndReplace(inputFolderName: String, outputFolderName: String, errorFolderName: String, folderSeparator: String, sparkSession: SparkSession): Unit = {
+    def retryPagesWithErrorAndReplace(dataFrameSrc: DataFrame, dataFrameDst: DataFrame, errorPagesSrc: DataFrame, errorPagesDst: DataFrame, sparkSession: SparkSession) = {
 
       val sparkContext = sparkSession.sparkContext
 
       //per convertire RDD in DataFrame
       import sparkSession.implicits._
 
+      /*
       FileUtils.deleteDirectory(new File(outputFolderName))
       FileUtils.forceMkdir(new File(errorFolderName))
+      */
 
       //dataFrame dai parquet inglesi
-      val dataFrameSrc = this.dataFrameFromFoldersRecursively(Array(inputFolderName), "en", sparkSession)
+      //val dataFrameSrc = this.dataFrameFromFoldersRecursively(Array(inputFolderName), "en", sparkSession)
 
-      val errorPagesSrc = this.collectErrorPagesFromFoldersRecursively(Array(inputFolderName), sparkSession).toDF("id2")
+      //val errorPagesSrc = this.collectErrorPagesFromFoldersRecursively(Array(inputFolderName), sparkSession).toDF("id2")
+      //val errorPagesSrc = sparkSession.read.textFile(errorFolderName + errorSrcFile).toDF("id2")
 
       var counter = 0
 
@@ -195,9 +198,9 @@ package Utilities {
 
         counter += 1
 
-        (line, tuple1._1, URLDecoder.decode(tuple1._2,  StandardCharsets.UTF_8), tuple2._1, tuple2._2, tuple3._1, tuple3._2)
+        (line, tuple1._1, URLDecoder.decode(tuple1._2,  "UTF-8"), tuple2._1, tuple2._2, tuple3._1, tuple3._2)
 
-      }).repartition(numPartitions)
+      })//.repartition(numPartitions)
 
       //creazione del DataFrame per en.wikipedia
       val tempDataFrameSrc = tempResultSrc.toDF("id", "num_traduzioni", "id_pagina_tradotta", "num_visualiz_anno", "num_visualiz_mesi", "byte_dim_page", "id_redirect")
@@ -208,20 +211,28 @@ package Utilities {
         select("id", "num_traduzioni", "id_pagina_tradotta", "num_visualiz_anno", "num_visualiz_mesi", "byte_dim_page", "id_redirect")
 
       //rimozione dalle pagine compresse di quelle con errori
-      val noErrorDataFrameSrc = dataFrameSrc.except(joinedDataFrameSrc).repartition(numPartitions)
+      val noErrorDataFrameSrc = dataFrameSrc.except(joinedDataFrameSrc)//.repartition(numPartitions)
 
-      val resultSrc = noErrorDataFrameSrc.union(tempDataFrameSrc)
+      val resultSrc = noErrorDataFrameSrc.union(tempDataFrameSrc).toDF("id", "num_traduzioni", "id_pagina_tradotta", "num_visualiz_anno", "num_visualiz_mesi", "byte_dim_page", "id_redirect")
 
-      resultSrc.repartition(numPartitions).write.parquet(outputFolderName + folderSeparator + "en")
+      //resultSrc.coalesce(1).write.parquet(outputFolderName + "/" + "en")
 
       //salvataggio degli errori per le API di en.wikipedia
-      this.writeFileID(errorFolderName + folderSeparator + "errorLangLinks.txt", APILangLinks.obtainErrorID(), sparkContext)
-      this.writeFileID(errorFolderName + folderSeparator + "errorView.txt",      APIPageView.obtainErrorID(), sparkContext)
-      this.writeFileID(errorFolderName + folderSeparator + "errorRedirect.txt",  APIRedirect.obtainErrorID(), sparkContext)
+      /*
+      this.writeFileID(errorFolderName + "/" + "errorLangLinks.txt", APILangLinks.obtainErrorID(), sparkContext)
+      this.writeFileID(errorFolderName + "/" + "errorView.txt",      APIPageView.obtainErrorID(), sparkContext)
+      this.writeFileID(errorFolderName + "/" + "errorRedirect.txt",  APIRedirect.obtainErrorID(), sparkContext)
+      */
 
+      val errorSrcDuplicates = Array[DataFrame](APILangLinks.obtainErrorID().toDF("id2"), APIPageView.obtainErrorID().toDF("id2"), APIRedirect.obtainErrorID().toDF("id2"))
+
+      val errorSrc = errorSrcDuplicates.reduce(_ union _).dropDuplicates().toDF("id2")
+
+      /*
       this.writeFileErrors(errorFolderName + folderSeparator + "errorLangLinksDetails.txt", APILangLinks.obtainErrorDetails())
       this.writeFileErrors(errorFolderName + folderSeparator + "errorViewDetails.txt",      APIPageView.obtainErrorDetails())
       this.writeFileErrors(errorFolderName + folderSeparator + "errorRedirectDetails.txt",  APIRedirect.obtainErrorDetails())
+      */
 
       //reset degli errori
       APILangLinks.resetErrorList()
@@ -232,15 +243,15 @@ package Utilities {
       val newDstPages = tempDataFrameSrc.select("id_pagina_tradotta").filter("id_pagina_tradotta != ''").toDF("id2")
 
       //dataFrame dei parquet italiani
-      val dataFrameDst = this.dataFrameFromFoldersRecursively(Array(inputFolderName), "it", sparkSession)
+      //val dataFrameDst = this.dataFrameFromFoldersRecursively(Array(inputFolderName), "it", sparkSession)
 
-      var errorPagesDst = this.collectErrorPagesFromFoldersRecursively(Array(inputFolderName), sparkSession).toDF("id2")
+      //var errorPagesDst = this.collectErrorPagesFromFoldersRecursively(Array(inputFolderName), sparkSession).toDF("id2")
 
-      errorPagesDst = errorPagesDst.union(newDstPages)
+      val errorPagesDst2 = errorPagesDst.union(newDstPages)
 
-      val dstPagesWithHash = errorPagesDst.filter(x => {x.getString(0).contains("#")})
+      val dstPagesWithHash = errorPagesDst2.filter(x => {x.getString(0).contains("#")})
 
-      val dstPagesToRetryWithoutHash = errorPagesDst.except(dstPagesWithHash)
+      val dstPagesToRetryWithoutHash = errorPagesDst2.except(dstPagesWithHash)
 
       val dstPagesToRetryWithHash = dstPagesWithHash.map(x => {
         x.getString(0).split("#")(0)
@@ -265,31 +276,40 @@ package Utilities {
 
         counter += 1
 
-        (line, URLDecoder.decode(tuple1._2,  StandardCharsets.UTF_8), tuple2._1, tuple2._2, tuple3._1, tuple3._2)
+        (line, URLDecoder.decode(tuple1._2, "UTF-8"), tuple2._1, tuple2._2, tuple3._1, tuple3._2)
 
-      }).repartition(numPartitions)
+      })//.repartition(numPartitions)
 
       val tempDataFrameDst = tempResultDst.toDF("id", "id_pagina_originale", "num_visualiz_anno", "num_visualiz_mesi", "byte_dim_page", "id_redirect")
 
-      val joinedDataFrameDst = dataFrameDst.join(errorPagesDst, dataFrameDst("id") === errorPagesDst("id2"), "inner").
+      val joinedDataFrameDst = dataFrameDst.join(errorPagesDst2, dataFrameDst("id") === errorPagesDst2("id2"), "inner").
         select("id", "id_pagina_originale", "num_visualiz_anno", "num_visualiz_mesi", "byte_dim_page", "id_redirect")
 
       //rimozione dalle pagine compresse di quelle con errori
-      val noErrorDataFrameDst = dataFrameDst.except(joinedDataFrameDst).repartition(numPartitions)
+      val noErrorDataFrameDst = dataFrameDst.except(joinedDataFrameDst)//.repartition(numPartitions)
 
-      val resultDst = noErrorDataFrameDst.union(tempDataFrameDst)
+      val resultDst = noErrorDataFrameDst.union(tempDataFrameDst).toDF("id", "id_pagina_originale", "num_visualiz_anno", "num_visualiz_mesi", "byte_dim_page", "id_redirect")
 
-      resultDst.repartition(numPartitions).write.parquet(outputFolderName + folderSeparator + "it")
+      //resultDst.coalesce(1).write.parquet(outputFolderName + "/" + "it")
 
       //salvataggio degli errori per le API di it.wikipedia
-      this.writeFileID(errorFolderName + folderSeparator + "errorLangLinksTranslated.txt", APILangLinks.obtainErrorID(), sparkContext)
-      this.writeFileID(errorFolderName + folderSeparator + "errorViewTranslated.txt",      APIPageView.obtainErrorID(), sparkContext)
-      this.writeFileID(errorFolderName + folderSeparator + "errorRedirectTranslated.txt",  APIRedirect.obtainErrorID(), sparkContext)
+      /*
+      this.writeFileID(errorFolderName + "/" + "errorLangLinksTranslated.txt", APILangLinks.obtainErrorID(), sparkContext)
+      this.writeFileID(errorFolderName + "/" + "errorViewTranslated.txt",      APIPageView.obtainErrorID(), sparkContext)
+      this.writeFileID(errorFolderName + "/" + "errorRedirectTranslated.txt",  APIRedirect.obtainErrorID(), sparkContext)
+      */
 
+      val errorDstDuplicates = Array[DataFrame](APILangLinks.obtainErrorID().toDF("id2"), APIPageView.obtainErrorID().toDF("id2"), APIRedirect.obtainErrorID().toDF("id2"))
+
+      val errorDst = errorDstDuplicates.reduce(_ union _).dropDuplicates().toDF("id2")
+
+      /*
       this.writeFileErrors(errorFolderName + folderSeparator + "errorLangLinksTranslatedDetails.txt", APILangLinks.obtainErrorDetails())
       this.writeFileErrors(errorFolderName + folderSeparator + "errorViewTranslatedDetails.txt",      APIPageView.obtainErrorDetails())
       this.writeFileErrors(errorFolderName + folderSeparator + "errorRedirectTranslatedDetails.txt",  APIRedirect.obtainErrorDetails())
+      */
 
+      (resultSrc, errorSrc, resultDst, errorDst)
     }
 
     def DEBUG_newDataFrame(inputFolderName: Array[String], sparkSession: SparkSession): Unit = {
