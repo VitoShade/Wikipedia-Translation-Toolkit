@@ -136,18 +136,9 @@ object analyseData extends App {
     //dataFrameSize.filter("id_ita == ''").show(false)
 
     val translateBonus_ = udf((score: Double, idIta: String, singleEn: Int, sumEn: Int, singleIt:Int, redirectDim:Int ) => {
-      var byteEn = 0
-      var byteIt = 0
-      var bonus = 0.0
-
-      if(idIta.isEmpty)
-        byteEn = singleEn
-      else
-        byteEn = sumEn
-
-      byteIt = singleIt + redirectDim
-
-      if (idIta.isEmpty) bonus = 10.0
+      val byteEn = if(idIta.isEmpty) singleEn else sumEn
+      val byteIt = singleIt + redirectDim
+      val bonus  = if(idIta.isEmpty) 10.0 else 0.0
 
       score + bonus + 20.0 * ((byteEn - byteIt).toDouble / math.max(byteEn, byteIt))
     })

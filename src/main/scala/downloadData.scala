@@ -7,11 +7,8 @@ import java.net._
 object downloadData extends App {
   override def main(args: Array[String]) {
 
-    //val sparkSession = SparkSession.builder().master("local[20]").appName("downloadData").getOrCreate()
     val sparkSession = SparkSession.builder().appName("downloadData").getOrCreate()
     val sparkContext = sparkSession.sparkContext
-
-    //println("Working with " + DataFrameUtility.numPartitions + " partitions")
 
     sparkContext.setLogLevel("WARN")
 

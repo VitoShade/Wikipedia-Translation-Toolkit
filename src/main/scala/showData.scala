@@ -10,14 +10,14 @@ object showData extends App {
 
     sparkContext.setLogLevel("WARN")
 
-    DataFrameUtility.dataFrameFromFoldersRecursively(Array("/Users/stefano/IdeaProjects/Wikipedia-Translation-Toolkit/src/main/files/outputProcessati"), "en", sparkSession)
+    DataFrameUtility.dataFrameFromFoldersRecursively(Array("/Users/stefano/IdeaProjects/Wikipedia-Translation-Toolkit/src/main/files/outputProcessati/File1-10/"), "en", sparkSession)
                     .coalesce(1)
                     .write
-                    .parquet("/Users/stefano/IdeaProjects/Wikipedia-Translation-Toolkit/src/main/files/nuovaCartella/en")
-    DataFrameUtility.dataFrameFromFoldersRecursively(Array("/Users/stefano/IdeaProjects/Wikipedia-Translation-Toolkit/src/main/files/outputProcessati"), "it", sparkSession)
+                    .parquet("/Users/stefano/IdeaProjects/Wikipedia-Translation-Toolkit/src/main/files/nuovaCartella1-10/en")
+    DataFrameUtility.dataFrameFromFoldersRecursively(Array("/Users/stefano/IdeaProjects/Wikipedia-Translation-Toolkit/src/main/files/outputProcessati/File1-10/"), "it", sparkSession)
                     .coalesce(1)
                     .write
-                    .parquet("/Users/stefano/IdeaProjects/Wikipedia-Translation-Toolkit/src/main/files/nuovaCartella/it")
+                    .parquet("/Users/stefano/IdeaProjects/Wikipedia-Translation-Toolkit/src/main/files/nuovaCartella1-10/it")
 
     sparkSession.stop()
   }
