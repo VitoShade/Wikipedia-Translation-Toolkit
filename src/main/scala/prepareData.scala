@@ -6,7 +6,6 @@ import org.apache.spark.sql.functions.{col, collect_set, sum, udf, when}
 import scala.collection.mutable
 import scala.collection.mutable.{WrappedArray => WA}
 
-
 object prepareData extends App {
   override def main(args: Array[String]) {
 
@@ -19,14 +18,11 @@ object prepareData extends App {
 
     val startTime = System.currentTimeMillis()
 
-    //raccolta di tutti i file .txt nella cartella di input
     val nFile = args.drop(1).length
     val bucket = args(0)
 
     val errorFolderName   = bucket + "error/"
-    //val folderSeparator   = "/"
     val outputFolderName  = bucket + "datiFinali/"
-    //val outputErrorFolderName  = bucket + "datiFinali/error/"
     val sizeFolderName    = bucket + "datiFinali/size/"
 
     // Unione dei DataFrame dai parquet inglesi
@@ -38,23 +34,14 @@ object prepareData extends App {
     var dataFrameDst = dataFramesIt.reduce(_ union _)
 
     // Retry errori durante downloadData e pulizia link a pagine italiane
-    /*
-    FileUtils.deleteDirectory(new File(errorFolderName))
-    FileUtils.forceMkdir(new File(errorFolderName))
-    */
-
     var errorPagesSrc = sparkSession.read.textFile(errorFolderName + "errors.txt").toDF("id2")
     var errorPagesDst = sparkSession.read.textFile(errorFolderName + "errorsTranslated.txt").toDF("id2")
 
-
     val (resultSrc1, errorSrc1, resultDst1, errorDst1) = DataFrameUtility.retryPagesWithErrorAndReplace(dataFrameSrc, dataFrameDst, errorPagesSrc, errorPagesDst, sparkSession)
-
     dataFrameSrc = resultSrc1
     errorPagesSrc = errorSrc1
     dataFrameDst = resultDst1
     errorPagesDst = errorDst1
-
-
 
     APILangLinks.resetErrorList()
     APIPageView.resetErrorList()
@@ -67,7 +54,6 @@ object prepareData extends App {
     dataFrameDst = missingIDsDF(dataFrameDst, sparkSession).dropDuplicates()
 
     val errorMissingIDDuplicates = Array[DataFrame](APILangLinks.obtainErrorID().toDF("id2"), APIPageView.obtainErrorID().toDF("id2"), APIRedirect.obtainErrorID().toDF("id2"))
-
     val errorMissingID = errorMissingIDDuplicates.reduce(_ union _).dropDuplicates().toDF("id2")
 
     // Cancellazione pagine con errori
@@ -79,10 +65,6 @@ object prepareData extends App {
     resultDataFrameSrc.coalesce(1).write.parquet(outputFolderName + "en")
     resultDataFrameDst.coalesce(1).write.parquet(outputFolderName + "it")
     dimPageDF.coalesce(1).write.parquet(sizeFolderName)
-
-    //Controllo se è corretto
-    //val removeEmpty = udf((array: Seq[String]) => !array.isEmpty)
-    //dimPageDF.filter(removeEmpty($"id_traduzioni_redirect")).show(10, false)
 
     val endTime = System.currentTimeMillis()
 
@@ -145,7 +127,6 @@ object prepareData extends App {
         collect_set(when(!(col("id_pagina_tradotta") === ""), col("id_pagina_tradotta"))).as("id_traduzioni_redirect")
       ).withColumnRenamed("id_redirect","id")
 
-
     //somma del numero di visualizzazioni delle redirect alle pagine principali
     explodedSrc.filter("id_redirect == ''")
       .join(redirectSrc, Seq("id"), "left_outer")
@@ -162,8 +143,6 @@ object prepareData extends App {
   }
 
   def missingIDsDF(dataFrameDst: DataFrame, sparkSession: SparkSession) = {
-
-    //val sparkContext = sparkSession.sparkContext
     import sparkSession.implicits._
 
     val idDF = dataFrameDst.select("id").rdd.map(_.getAs[String](0)).collect().toList
@@ -176,26 +155,10 @@ object prepareData extends App {
       (line.getAs[String](0), URLDecoder.decode(tuple1._2,  "UTF-8"), tuple2._1, tuple2._2, tuple3._1, tuple3._2)
     }).toDF("id", "id_pagina_originale", "num_visualiz_anno", "num_visualiz_mesi", "byte_dim_page", "id_redirect")).persist
 
-    //salvataggio degli errori per le API di it.wikipedia
-    //DataFrameUtility.writeFileID(errorFolderName + "errorLangLinksMissingIDsDF", APILangLinks.obtainErrorID(), sparkContext)
-    //DataFrameUtility.writeFileID(errorFolderName + "errorViewMissingIDsDF",      APIPageView.obtainErrorID(), sparkContext)
-    //DataFrameUtility.writeFileID(errorFolderName + "errorRedirectMissingIDsDF",  APIRedirect.obtainErrorID(), sparkContext)
-
     dataFrame
   }
 
   def removeErrorPages(compressedSrc: DataFrame, dataFrameDst: DataFrame, errorMissingID: DataFrame, errorPagesSrc: DataFrame, errorPagesDst: DataFrame) = {
-
-    //val errorSrcFiles = Array("errorLangLinks.txt", "errorView.txt", "errorRedirect.txt")
-    //val errorDstFiles = Array("errorLangLinksTranslated.txt", "errorViewTranslated.txt", "errorRedirectTranslated.txt")
-
-    //val errorSrcFile = "errors.txt"
-    //val errorDstFile = "errorsTranslated.txt"
-
-    //pagine inglesi che hanno avuto errori con le API
-    //val errorPagesSrc = sparkSession.read.textFile(errorFolderName + errorSrcFile).toDF("id2")
-    //val errorPagesSrc = DataFrameUtility.collectErrorPagesFromFoldersRecursively(errorSrcFiles.map (x => bucket + x), sparkSession).toDF("id2")
-
     //sottoinsieme delle pagine inglesi compresse che hanno avuto problemi
     val joinedCompressedSrc = compressedSrc.join(errorPagesSrc, compressedSrc("id") === errorPagesSrc("id2"), "inner").
       select("id", "num_traduzioni", "id_pagina_tradotta", "num_visualiz_anno", "num_visualiz_mesi", "byte_dim_page", "id_traduzioni_redirect")
@@ -204,9 +167,7 @@ object prepareData extends App {
     val resultDataFrameSrc = compressedSrc.except(joinedCompressedSrc)//.toDF("id", "num_traduzioni", "id_pagina_tradotta", "num_visualiz_anno", "num_visualiz_mesi", "byte_dim_page", "id_traduzioni_redirect")
 
     //pagine italiane che hanno avuto errori con le API
-    //var errorPagesDst = sparkSession.read.textFile(errorFolderName + errorDstFile).toDF("id2")
     var errorPagesDstLocal = errorPagesDst
-    //val errorPagesDst = DataFrameUtility.collectErrorPagesFromFoldersRecursively(errorDstFiles.map (x => bucket + x), sparkSession).toDF("id2")
 
     errorPagesDstLocal = errorPagesDstLocal.union(errorMissingID).dropDuplicates()
 
@@ -246,7 +207,6 @@ object prepareData extends App {
       .sum("byte_dim_page")
       .withColumnRenamed("sum(byte_dim_page)","byte_dim_page_tot")
       .withColumnRenamed("id_ita", "id_ita2")
-      //.repartition(DataFrameUtility.numPartitions)
 
     res.join(sumDF, res("id_ita") === sumDF("id_ita2")).drop("id_ita2")
   }

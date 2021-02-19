@@ -21,15 +21,4 @@ object showData extends App {
 
     sparkSession.stop()
   }
-
-  def memoryInfo(): Unit = {
-    val mb = 1024*1024
-    val runtime = Runtime.getRuntime
-    println("ALL RESULTS IN MB")
-    println("** Used Memory:  " + (runtime.totalMemory - runtime.freeMemory) / mb)
-    println("** Free Memory:  " + runtime.freeMemory / mb)
-    println("** Total Memory: " + runtime.totalMemory / mb)
-    println("** Max Memory:   " + runtime.maxMemory / mb)
-  }
-
 }

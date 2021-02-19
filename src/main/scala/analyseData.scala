@@ -1,5 +1,3 @@
-
-import Utilities._
 import org.apache.spark.sql.SparkSession
 import org.apache.spark.sql.functions.desc
 import scala.collection.mutable.{WrappedArray => WA}
@@ -19,9 +17,7 @@ object analyseData extends App {
 
     val bucket = args(0)
 
-    val inputFolderName   = bucket + "datiFinali/"
     val outputFolderName  = bucket + "risultato/"
-    val folderSeparator   = "/"
 
     val startTime = System.currentTimeMillis()
 
@@ -47,7 +43,6 @@ object analyseData extends App {
     val sumLong_ = udf((xs: WA[Long]) => xs.sum.toInt)
     val sumInt_ = udf((xs: WA[Int]) => xs.sum)
 
-
     // Somma visualizzazioni anno
     val minMaxSrc = dataFrameSrc.withColumn("sum", sumLong_($"num_visualiz_anno")).sort(desc("sum"))
     val minMaxDst = dataFrameDst.withColumn("sum", sumInt_($"num_visualiz_anno")).sort(desc("sum"))
@@ -59,11 +54,8 @@ object analyseData extends App {
 
     //dataframe con score
     var scoreDF = minMaxSrc.withColumn("score",score_(maxSrc)($"sum")).sort(desc("score"))
-    //scoreDF.show(20, false)
 
     var scoreDFDst = minMaxDst.withColumn("score",score_(maxDst)($"sum")).sort(desc("score"))
-    //scoreDFDst.show(20, false)
-
 
     // Crescita/decrescita per anni/mesi
     def growingYearBonuses_ = udf((score: Double, xs: WA[AnyVal]) => {
@@ -77,10 +69,7 @@ object analyseData extends App {
     })
 
     scoreDF = scoreDF.withColumn("score",growingYearBonuses_($"score", $"num_visualiz_anno")).sort(desc("score"))
-    //scoreDF.show(20, false)
-
     scoreDFDst = scoreDFDst.withColumn("score",growingYearBonuses_($"score", $"num_visualiz_anno")).sort(desc("score"))
-    //scoreDFDst.show(20, false)
 
     def growingMonthBonuses_ = udf((score: Double, xs: WA[AnyVal]) => {
 
@@ -97,10 +86,8 @@ object analyseData extends App {
     })
 
     scoreDF = scoreDF.withColumn("score",growingMonthBonuses_($"score", $"num_visualiz_mesi")).sort(desc("score"))
-    //scoreDF.show(20, false)
 
     scoreDFDst = scoreDFDst.withColumn("score",growingMonthBonuses_($"score", $"num_visualiz_mesi")).sort(desc("score"))
-    //scoreDFDst.show(20, false)
 
     val maxScoreSrc = scoreDF.first().getAs[Double](8)
     val maxScoreDst = scoreDFDst.first().getAs[Double](7)
@@ -112,7 +99,6 @@ object analyseData extends App {
       .na.fill(0, Seq("scoreIta"))
       .sort(desc("score"))
 
-    //scoreDF.show(20, false)
 
     //riuniune score su tabella inglese
 
@@ -123,17 +109,12 @@ object analyseData extends App {
 
     scoreDF = scoreDF.withColumn("score", sumMean_($"score", $"id_pagina_tradotta", $"scoreIta")).sort(desc("score"))
     scoreDF = scoreDF.drop("sum","scoreIta","id_pagina_tradotta")
-    //scoreDF.show(20, false)
 
     //dimensioni
-    //scoreDF.filter("id == '123Movies'").show(2, false)
 
     dataFrameSize = dataFrameSize.join(scoreDF.select("id","score"),Seq("id")).sort(desc("score"))
-    //dataFrameSize.filter("id == '123Movies'").show(2, false)
 
     // bonus pagina senza traduzione linkate correttamente
-
-    //dataFrameSize.filter("id_ita == ''").show(false)
 
     val translateBonus_ = udf((score: Double, idIta: String, singleEn: Int, sumEn: Int, singleIt:Int, redirectDim:Int ) => {
       val byteEn = if(idIta.isEmpty) singleEn else sumEn
@@ -145,7 +126,6 @@ object analyseData extends App {
 
     //Aggiungiamo le pagine con link rotti
     dataFrameSize = dataFrameSize.withColumn("score", translateBonus_($"score", $"id_ita", $"byte_dim_page", $"byte_dim_page_tot", $"byte_dim_page_ita_original", $"id_traduzioni_redirect_dim")).sort(desc("score"))
-    //dataFrameSize.show(20, false)
 
     // riporto lo score
     scoreDF = scoreDF.drop("score").join(dataFrameSize.select("id", "score"), Seq("id")).sort(desc("score"))
@@ -155,7 +135,6 @@ object analyseData extends App {
 
     scoreDF.select("id", "score").rdd.coalesce(1).saveAsTextFile(outputFolderName+"rankTXT")
     scoreDF.select("id", "score").coalesce(1).write.csv(outputFolderName+"rankCSV")
-
 
     val endTime = System.currentTimeMillis()
 
