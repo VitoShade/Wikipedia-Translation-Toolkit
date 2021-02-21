@@ -1,8 +1,10 @@
 import java.net.URLDecoder
+
 import API._
 import org.apache.spark.sql.{DataFrame, SparkSession}
 import Utilities._
-import org.apache.spark.sql.functions.{col, collect_set, sum, udf, when}
+import org.apache.spark.sql.functions.{col, collect_set, explode, sum, udf, when}
+
 import scala.collection.mutable
 import scala.collection.mutable.{WrappedArray => WA}
 
@@ -184,68 +186,51 @@ object prepareData extends App {
   def makeDimDF(mainDF: DataFrame, transDF: DataFrame, sparkSession: SparkSession) = {
     import sparkSession.implicits._
 
-    //crea una Map[String, Tuple(String, Int)] con: chiave = id della pagina italiana; valore = (id_redirect, dim)
-    //se la pagina non italiana non ha redirect, allora dentro id_redirect salva l'id della pagina.
-    //La dimensione è quella della pagina italiana e non della redirect.
-
-    //old
-    /*
-    val mappa = transDF.map(row =>
-      (row.getString(0), Tuple2(if(row.getString(5).nonEmpty) row.getString(5) else row.getString(0), row.getInt(4)))
-    ).collect().toMap.withDefaultValue(Tuple2("",0))
-
-    //Per ogni pagina italiana che è redirect, cambia il valore dim con la dim della pagina puntata
-    val mappa2 = mappa.keys.map(id => {
-      val (originalID, dim) = mappa(id)
-      if(originalID==id) {(id,Tuple2(originalID, dim))} else {(id,Tuple2(originalID, mappa(originalID)._2))}
-    }).toMap.withDefaultValue(Tuple2("",0))
-
-    */
-
     val df1 = transDF.map(row => {
       (row.getString(0), if(row.getString(5).nonEmpty) row.getString(5) else row.getString(0), row.getInt(4))
-    }).toDF("id2", "id_redirect2", "dim2") //0, 1, 2
-/*
-    val df2 = df1.map(row => {
-      val originalID =  row.getString(1)
-      val dim = row.getInt(2)
-      if(originalID == row.getString(0)){
-        (row.getString(0), originalID, dim)
-      }
-      else{
-        (row.getString(0), originalID, df1.filter("id_redirect == '" + originalID + "'").first().getInt(2))
-      }
-    }).toDF("id", "id_redirect", "dim")
-*/
-    //transDF(3"id", 4"id_pagina_originale", 5"num_visualiz_anno", 6"num_visualiz_mesi", 7"byte_dim_page", 8"id_redirect")
-    val df3 = df1.join(transDF, df1("id_redirect2")===transDF("id"), "left_outer").map(row => {
+    }).toDF("id2", "id_redirect2", "dim2")
+
+    val df3 = df1.join(transDF, df1("id_redirect2")===transDF("id"), "left_outer").na.fill("", Seq("id_pagina_originale")).map(row => {
       val id = row.getString(0)
       val id_redirect = row.getString(1)
       val dim = if(row.getString(1) == row.getString(0)) row.getInt(2) else row.getInt(7)
       (id, id_redirect, dim)
       }
-    ).toDF("id2", "id_redirect2", "dim2") //7,8,9
-/*
-    val res = mainDF.map(row => {
-      val (redirectID, dimRedirect) = (df2.filter("id == '" + row.getString(2) + "'").first.getString(1), df2.filter("id == '" + row.getString(2) + "'").first.getInt(2))
-      val arr = row.getAs[mutable.WrappedArray[String]](6).map(redirectID =>  df2.filter("id == '" + redirectID + "'").first.getString(0)) //mappa2(redirectID)._1)
-      (row.getString(0), row.getInt(5), arr,                redirectID, dimRedirect,                  arr.map(redirectID => df2.filter("id == '" + redirectID + "'").first.getInt(2)).sum)
-    }).toDF("id",  "byte_dim_page", "id_traduzioni_redirect", "id_ita", "byte_dim_page_ita_original", "id_traduzioni_redirect_dim")
-*/
-    //mainDF(0"id", 1"num_traduzioni", 2"id_pagina_tradotta", 3"num_visualiz_anno", 4"num_visualiz_mesi", 5"byte_dim_page", 6"id_traduzioni_redirect")
+    ).toDF("id2", "id_redirect2", "dim2")
 
     val res = mainDF.join(df3, mainDF("id_pagina_tradotta")===df3("id2")).map( row => {
         val id = row.getString(0)
         val byte_dim_page = row.getInt(5)
-        val id_traduzioni_redirect = row.getAs[mutable.WrappedArray[String]](6)//.map(redirectID => { row.getString(7) })
+        val id_traduzioni_redirect = row.getAs[mutable.WrappedArray[String]](6)
         val id_ita = row.getString(8)
         val byte_dim_page_ita_original = row.getInt(9)
         val id_traduzioni_redirect_dim = 0
         (id, byte_dim_page, id_traduzioni_redirect, id_ita, byte_dim_page_ita_original, id_traduzioni_redirect_dim)
       }
     ).toDF("id",  "byte_dim_page", "id_traduzioni_redirect", "id_ita", "byte_dim_page_ita_original", "id_traduzioni_redirect_dim")
+    //TODO: rimuovere id_traduzioni_redirect
 
-    val sumDF = res.groupBy("id_ita")
+    val redirect = res.select($"id", explode($"id_traduzioni_redirect")).toDF("id_original", "id_redirect_exploded")
+
+    val DF_join = df3.join(redirect, df3("id2")===redirect("id_redirect_exploded")).map(row => {
+      val id = row.getString(3)
+      val redirect_dim = row.getString(2)
+      (id, redirect_dim)
+    }).toDF("id3","dim_redirect3").groupBy("id3")
+      .sum("dim_redirect3")
+      .withColumnRenamed("sum(dim_redirect3)","id_traduzioni_redirect_dim3")
+
+    val finalRes = res.join(DF_join, res("id")===DF_join("id3"), "left_outer").na.fill(0, Seq("id_traduzioni_redirect_dim3")).map(row => {
+      val id = row.getString(0)
+      val byte_dim_page = row.getInt(1)
+      val id_traduzioni_redirect = row.getAs[mutable.WrappedArray[String]](2)
+      val id_ita = row.getString(3)
+      val byte_dim_page_ita_original = row.getInt(4)
+      val id_traduzioni_redirect_dim = row.getInt(7)
+      (id, byte_dim_page, id_traduzioni_redirect, id_ita, byte_dim_page_ita_original, id_traduzioni_redirect_dim)
+    })
+
+    val sumDF = finalRes.groupBy("id_ita")
       .sum("byte_dim_page")
       .withColumnRenamed("sum(byte_dim_page)","byte_dim_page_tot")
       .withColumnRenamed("id_ita", "id_ita2")
