@@ -65,7 +65,7 @@ object analyseData extends App {
       val delta1 = (years(1) - years(0)).toDouble / math.max(years(0),1)
       val delta2 = (years(2) - years(1)).toDouble / math.max(years(0),1)
       //tarare le costanti
-      (tanh(delta1)*6)+(tanh(delta2)*6)+score
+      (tanh(delta1)*6)+(tanh(delta2)*8)+score
     })
 
     scoreDF = scoreDF.withColumn("score",growingYearBonuses_($"score", $"num_visualiz_anno")).sort(desc("score"))
@@ -82,7 +82,7 @@ object analyseData extends App {
       val delta1 = (delta(1) - delta(0)).toDouble / math.max(delta(0),1)
       val delta2 = (delta(2) - delta(1)).toDouble / math.max(delta(0),1)
       //tarare le costanti
-      (tanh(delta1)*2)+(tanh(delta2)*2)+score
+      (tanh(delta1)*2)+(tanh(delta2)*3)+score
     })
 
     scoreDF = scoreDF.withColumn("score",growingMonthBonuses_($"score", $"num_visualiz_mesi")).sort(desc("score"))
@@ -119,9 +119,9 @@ object analyseData extends App {
     val translateBonus_ = udf((score: Double, idIta: String, singleEn: Int, sumEn: Int, singleIt:Int, redirectDim:Int ) => {
       val byteEn = if(idIta.isEmpty) singleEn else sumEn
       val byteIt = singleIt + redirectDim
-      val bonus  = if(idIta.isEmpty) 10.0 else 0.0
+      val bonus  = if(idIta.isEmpty) 8.0 else 0.0
 
-      score + bonus + 20.0 * ((byteEn - byteIt).toDouble / math.max(byteEn, byteIt))
+      score + bonus + 25.0 * ((byteEn - byteIt).toDouble / math.max(byteEn, byteIt))
     })
 
     //Aggiungiamo le pagine con link rotti
