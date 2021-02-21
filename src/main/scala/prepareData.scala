@@ -252,13 +252,13 @@ object prepareData extends App {
         (row.getString(0), originalID, dim)
       }
       else{
-        (row.getString(0), originalID, df1.filter("id_redirect == '" + originalID + "'").select("dim"))
+        (row.getString(0), originalID, df1.filter("id_redirect == '" + originalID + "'").first().getInt(2))
       }
     }).toDF("id", "id_redirect", "dim")
 
 
     val res = mainDF.map(row => {
-      val (redirectID, dimRedirect) = (df2.filter("id == '" + row.getString(2) + "'").select("id_redirect"), df2.filter("id == '" + row.getString(2) + "'").select("dim"))
+      val (redirectID, dimRedirect) = (df2.filter("id == '" + row.getString(2) + "'").first.getString(1), df2.filter("id == '" + row.getString(2) + "'").first.getInt(2))
       val arr = row.getAs[mutable.WrappedArray[String]](6).map(redirectID =>  df2.filter("id == '" + redirectID + "'").first.getString(0)) //mappa2(redirectID)._1)
       (row.getString(0), row.getInt(5), arr, redirectID, dimRedirect, arr.map(redirectID => df2.filter("id == '" + redirectID + "'").first.getInt(2)).sum)
     }).toDF("id",  "byte_dim_page", "id_traduzioni_redirect", "id_ita", "byte_dim_page_ita_original", "id_traduzioni_redirect_dim")
