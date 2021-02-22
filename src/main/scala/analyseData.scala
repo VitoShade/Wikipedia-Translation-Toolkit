@@ -148,11 +148,9 @@ object analyseData extends App {
 
     // riporto lo score
     scoreDF = scoreDF.drop("score").join(dataFrameSize.select("id", "score"), Seq("id")).sort(desc("score"))
-    scoreDF.show(20,false)
+    //scoreDF.show(20,false)
 
-    scoreDF.coalesce(1).write.parquet(outputFolderName+"rankPARQ")
 
-    scoreDF.select("id", "score").rdd.coalesce(1).saveAsTextFile(outputFolderName+"rankTXT")
     scoreDF.select("id", "score").coalesce(1).write.csv(outputFolderName+"rankCSV")
 
 

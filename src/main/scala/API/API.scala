@@ -28,7 +28,7 @@ package API {
       var counter: Int = 0
       var lista_errori_tmp: Vector[(Int, String)] = Vector()
       //println(url + " pt1")
-      while(!cond && (counter < 10)) {
+      while(!cond && (counter < 5)) {
         try {
           result = Http("https://" + URLEncoder.encode(sourceLang, "UTF-8") +
             ".wikipedia.org/w/api.php?action=parse&page=" + URLEncoder.encode(url, "UTF-8") + "&format=json&prop=langlinks"
@@ -44,7 +44,7 @@ package API {
             lista_errori_tmp = lista_errori_tmp :+  (counter, "codice risposta diverso da 2xx")
 
             if(!cond){
-              Thread.sleep(500)
+              //Thread.sleep(500)
             }
           }
         }catch{
@@ -90,7 +90,7 @@ package API {
       var counter: Int = 0
       var lista_errori_tmp: Vector[(Int, String)] = Vector()
       //println(url + " pt3")
-      while(!cond && (counter <10)) {
+      while(!cond && (counter <5)) {
         try {
           result = Http("https://" + URLEncoder.encode(lang, "UTF-8") +
             ".wikipedia.org/w/api.php?action=parse&page=" + URLEncoder.encode(url, "UTF-8") + "&prop=text&format=json").asString
@@ -107,7 +107,7 @@ package API {
             lista_errori_tmp = lista_errori_tmp :+  (counter, "codice risposta diverso da 2xx")
 
             if(!cond){
-              Thread.sleep(500)
+              //Thread.sleep(500)
             }
           }
         }catch{
@@ -154,7 +154,7 @@ package API {
       var counter: Int = 0
       var lista_errori_tmp: Vector[(Int, String)] = Vector()
       //println(url + " pt2")
-      while(!cond && (counter < 10)) {
+      while(!cond && (counter < 5)) {
         try {
           result = Http("https://wikimedia.org/api/rest_v1/metrics/pageviews/per-article/" + URLEncoder.encode(lang, "UTF-8") +
             ".wikipedia/all-access/all-agents/" + URLEncoder.encode(url, "UTF-8") + "/monthly/20180101/20210101").asString
@@ -166,7 +166,7 @@ package API {
             lista_errori_tmp = lista_errori_tmp :+  (counter, "codice risposta diverso da 2xx")
 
             if(!cond){
-              Thread.sleep(500)
+              //Thread.sleep(500)
             }
           }
         } catch {
