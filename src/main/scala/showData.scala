@@ -36,11 +36,11 @@ object showData extends App {
 
     //sparkContext.parallelize(Array[String]("pippo", "pluto", "paperino")).coalesce(1).saveAsTextFile("s3n://wtt-s3-1/exp/fileSingolo.txt")
 
-    /*
-    DataFrameUtility.dataFrameFromFoldersRecursively(Array("C:\\Users\\nik_9\\Desktop\\prova\\outputProcessati"), "en", sparkSession).coalesce(1).write.parquet("C:\\Users\\nik_9\\Desktop\\prova\\nuovaCartella\\en")
-    DataFrameUtility.dataFrameFromFoldersRecursively(Array("C:\\Users\\nik_9\\Desktop\\prova\\outputProcessati"), "it", sparkSession).coalesce(1).write.parquet("C:\\Users\\nik_9\\Desktop\\prova\\nuovaCartella\\it")
-    */
 
+    //DataFrameUtility.dataFrameFromFoldersRecursively(Array("C:\\Users\\nik_9\\Desktop\\prova\\Nuova cartella"), "en", sparkSession).coalesce(1).write.parquet("C:\\Users\\nik_9\\Desktop\\prova\\unioneCompleta\\en")
+    //DataFrameUtility.dataFrameFromFoldersRecursively(Array("C:\\Users\\nik_9\\Desktop\\prova\\Nuova cartella"), "it", sparkSession).coalesce(1).write.parquet("C:\\Users\\nik_9\\Desktop\\prova\\unioneCompleta\\it")
+
+    sparkContext.getConf.getAll.foreach(println)
 
     //res.show(false)
 
@@ -48,24 +48,8 @@ object showData extends App {
 
     //res.coalesce(1).write.parquet("C:\\Users\\nik_9\\Desktop\\prova\\nuovaCartella\\en")
 
-    val sqlContext = sparkSession.sqlContext
-
-    val accessKeyId = "ASIAWEHWHRM2ID6ERWPJ"
-    val secretAccessKey = "+k5EA0lHBDY/bO0s1NjMzqpWarts0U1WY/G3P7nt"
-
-    sparkContext.hadoopConfiguration.set("fs.s3n.awsAccessKeyId", accessKeyId)
-    sparkContext.hadoopConfiguration.set("fs.s3n.awsSecretAccessKey", secretAccessKey)
-    sparkContext.hadoopConfiguration.set("fs.s3n.impl","org.apache.hadoop.fs.s3native.NativeS3FileSystem")
-
-    val df = sqlContext.read
-      //.format("com.databricks.spark.csv")
-      //.option("header", "true")
-      //.option("inferSchema", "true")
-      .load("s3n://wtt-s3-1/indici/file53.txt")
 
     //val in = sparkSession.read.load("s3n://wtt-s3-1/indici/file53.txt")
-
-    df.foreach(x => println(x))
 
     val endTime = System.currentTimeMillis()
 

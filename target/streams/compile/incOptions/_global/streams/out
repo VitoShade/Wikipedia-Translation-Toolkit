@@ -1,26 +1,11 @@
 [debug] Created transactional ClassFileManager with tempDir = C:\Users\nik_9\IdeaProjects\Wikipedia-Translation-Toolkit\target\scala-2.12\classes.bak
 [debug] About to delete class files:
-[debug] 	prepareData$.class
-[debug] 	prepareData$$typecreator8$1.class
-[debug] 	prepareData$$typecreator4$2.class
-[debug] 	prepareData$$typecreator5$1.class
-[debug] 	prepareData$$typecreator4$1.class
-[debug] 	prepareData.class
-[debug] 	prepareData$$typecreator4$3.class
+[debug] 	showData.class
+[debug] 	showData$.class
 [debug] We backup class files:
-[debug] 	prepareData$.class
-[debug] 	prepareData$$typecreator8$1.class
-[debug] 	prepareData$$typecreator4$2.class
-[debug] 	prepareData$$typecreator5$1.class
-[debug] 	prepareData$$typecreator4$1.class
-[debug] 	prepareData.class
-[debug] 	prepareData$$typecreator4$3.class
+[debug] 	showData.class
+[debug] 	showData$.class
 [debug] Registering generated classes:
-[debug] 	prepareData$.class
-[debug] 	prepareData$$typecreator8$1.class
-[debug] 	prepareData$$typecreator4$2.class
-[debug] 	prepareData$$typecreator5$1.class
-[debug] 	prepareData$$typecreator4$1.class
-[debug] 	prepareData.class
-[debug] 	prepareData$$typecreator4$3.class
+[debug] 	showData.class
+[debug] 	showData$.class
 [debug] Removing the temporary directory used for backing up class files: C:\Users\nik_9\IdeaProjects\Wikipedia-Translation-Toolkit\target\scala-2.12\classes.bak
