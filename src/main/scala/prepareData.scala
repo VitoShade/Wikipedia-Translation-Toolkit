@@ -7,11 +7,10 @@ import org.apache.spark.sql.functions.{col, collect_set, explode, sum, udf, when
 import scala.collection.mutable
 import scala.collection.mutable.{WrappedArray => WA}
 
-
 object prepareData extends App {
   override def main(args: Array[String]) {
 
-    val sparkSession = SparkSession.builder().appName("prepareData").config("spark.sql.broadcastTimeout", "600").getOrCreate()
+    val sparkSession = SparkSession.builder().appName("prepareData").getOrCreate()
     val sparkContext = sparkSession.sparkContext
     sparkContext.setLogLevel("WARN")
 
@@ -20,14 +19,11 @@ object prepareData extends App {
 
     val startTime = System.currentTimeMillis()
 
-    //raccolta di tutti i file .txt nella cartella di input
     val nFile = args.drop(1).length
     val bucket = args(0)
 
     val errorFolderName   = bucket + "error/"
-    //val folderSeparator   = "/"
     val outputFolderName  = bucket + "datiFinali/"
-    //val outputErrorFolderName  = bucket + "datiFinali/error/"
     val sizeFolderName    = bucket + "datiFinali/size/"
 
     /*
@@ -46,40 +42,12 @@ object prepareData extends App {
     val dataFrameSrc = sparkSession.read.parquet(bucket + args(1))//.repartition(8)
     var dataFrameDst = sparkSession.read.parquet(bucket + args(2))//.repartition(4)
 
-    // Retry errori durante downloadData e pulizia link a pagine italiane
-    /*
-    FileUtils.deleteDirectory(new File(errorFolderName))
-    FileUtils.forceMkdir(new File(errorFolderName))
-    */
-
-    sparkContext.getConf.getAll.foreach(println)
-    println(sparkContext.statusTracker.getExecutorInfos.length)
     val errorPagesSrc = sparkSession.read.textFile(errorFolderName + "errors.txt").toDF("id2")
     val errorPagesDst = sparkSession.read.textFile(errorFolderName + "errorsTranslated.txt").toDF("id2")
-
-
-    /*
-    val (resultSrc1, errorSrc1, resultDst1, errorDst1) = DataFrameUtility.retryPagesWithErrorAndReplace(dataFrameSrc, dataFrameDst, errorPagesSrc, errorPagesDst, sparkSession)
-
-    dataFrameSrc = resultSrc1
-    errorPagesSrc = errorSrc1
-    dataFrameDst = resultDst1
-    errorPagesDst = errorDst1
-
-
-*/  dataFrameSrc.dtypes.foreach(println)
-    print("\n")
-    dataFrameDst.dtypes.foreach(println)
-    print("\n")
-    errorPagesSrc.dtypes.foreach(println)
-    print("\n")
-    errorPagesDst.dtypes.foreach(println)
 
     APILangLinks.resetErrorList()
     APIPageView.resetErrorList()
     APIRedirect.resetErrorList()
-
-
 
     // Compressione dataframe da tradurre (togliendo redirect)
     val compressedSrc = compressRedirect(dataFrameSrc, sparkSession)
@@ -88,7 +56,6 @@ object prepareData extends App {
     dataFrameDst = missingIDsDF(dataFrameDst, sparkSession).dropDuplicates()
 
     val errorMissingIDDuplicates = Array[DataFrame](APILangLinks.obtainErrorID().toDF("id2"), APIPageView.obtainErrorID().toDF("id2"), APIRedirect.obtainErrorID().toDF("id2"))
-
     val errorMissingID = errorMissingIDDuplicates.reduce(_ union _).dropDuplicates().toDF("id2")
 
     // Cancellazione pagine con errori
@@ -97,13 +64,9 @@ object prepareData extends App {
     // Creazione DataFrame dimensioni
     val dimPageDF = makeDimDF(resultDataFrameSrc, resultDataFrameDst, sparkSession)
 
-    resultDataFrameSrc.write.parquet(outputFolderName + "en")
-    resultDataFrameDst.write.parquet(outputFolderName + "it")
-    dimPageDF.write.parquet(sizeFolderName)
-
-    //Controllo se è corretto
-    //val removeEmpty = udf((array: Seq[String]) => !array.isEmpty)
-    //dimPageDF.filter(removeEmpty($"id_traduzioni_redirect")).show(10, false)
+    resultDataFrameSrc.coalesce(1).write.parquet(outputFolderName + "en")
+    resultDataFrameDst.coalesce(1).write.parquet(outputFolderName + "it")
+    dimPageDF.coalesce(1).write.parquet(sizeFolderName)
 
     val endTime = System.currentTimeMillis()
 
@@ -166,11 +129,11 @@ object prepareData extends App {
         collect_set(when(!(col("id_pagina_tradotta") === ""), col("id_pagina_tradotta"))).as("id_traduzioni_redirect")
       ).withColumnRenamed("id_redirect","id")
 
-
     //somma del numero di visualizzazioni delle redirect alle pagine principali
     explodedSrc.filter("id_redirect == ''")
       .join(redirectSrc, Seq("id"), "left_outer")
-      .map(row => ( row.getAs[String](0),
+      .map(row => (
+        row.getAs[String](0),
         row.getAs[Int](1),
         row.getAs[String](3),
         (4 to 6) map ( i => row.getAs[Int](i)+row.getAs[Long](i+16)),
@@ -183,8 +146,6 @@ object prepareData extends App {
   }
 
   def missingIDsDF(dataFrameDst: DataFrame, sparkSession: SparkSession) = {
-
-    //val sparkContext = sparkSession.sparkContext
     import sparkSession.implicits._
 
     //val idDF = dataFrameDst.select("id").rdd.map(_.getAs[String](0)).collect().toList
@@ -195,40 +156,24 @@ object prepareData extends App {
       val tuple3 = APIRedirect.callAPI(line.getAs[String](0), "it")
 
       (line.getAs[String](0), URLDecoder.decode(tuple1._2,  "UTF-8"), tuple2._1, tuple2._2, tuple3._1, tuple3._2)
-    }).toDF("id", "id_pagina_originale", "num_visualiz_anno", "num_visualiz_mesi", "byte_dim_page", "id_redirect"))//.persist
-
-    //salvataggio degli errori per le API di it.wikipedia
-    //DataFrameUtility.writeFileID(errorFolderName + "errorLangLinksMissingIDsDF", APILangLinks.obtainErrorID(), sparkContext)
-    //DataFrameUtility.writeFileID(errorFolderName + "errorViewMissingIDsDF",      APIPageView.obtainErrorID(), sparkContext)
-    //DataFrameUtility.writeFileID(errorFolderName + "errorRedirectMissingIDsDF",  APIRedirect.obtainErrorID(), sparkContext)
+    }).toDF("id", "id_pagina_originale", "num_visualiz_anno", "num_visualiz_mesi", "byte_dim_page", "id_redirect"))
 
     dataFrame
   }
 
   def removeErrorPages(compressedSrc: DataFrame, dataFrameDst: DataFrame, errorMissingID: DataFrame, errorPagesSrc: DataFrame, errorPagesDst: DataFrame) = {
-
     //sottoinsieme delle pagine inglesi compresse che hanno avuto problemi
-    val joinedCompressedSrc = compressedSrc.join(errorPagesSrc, compressedSrc("id") === errorPagesSrc("id2"), "inner").
-      select("id", "num_traduzioni", "id_pagina_tradotta", "num_visualiz_anno", "num_visualiz_mesi", "byte_dim_page", "id_traduzioni_redirect")
+    val joinedCompressedSrc = compressedSrc.join(errorPagesSrc, compressedSrc("id") === errorPagesSrc("id2"), "left_outer")//.select("id", "num_traduzioni", "id_pagina_tradotta", "num_visualiz_anno", "num_visualiz_mesi", "byte_dim_page", "id_traduzioni_redirect")
 
-    //rimozione dalle pagine compresse di quelle con errori
-    val resultDataFrameSrc = compressedSrc.except(joinedCompressedSrc)//.toDF("id", "num_traduzioni", "id_pagina_tradotta", "num_visualiz_anno", "num_visualiz_mesi", "byte_dim_page", "id_traduzioni_redirect")
+    val resultDataFrameSrc = joinedCompressedSrc.filter(joinedCompressedSrc.col("id2").isNull).select("id", "num_traduzioni", "id_pagina_tradotta", "num_visualiz_anno", "num_visualiz_mesi", "byte_dim_page", "id_traduzioni_redirect")
 
     //pagine italiane che hanno avuto errori con le API
-    var errorPagesDstLocal = errorPagesDst
-    errorPagesDstLocal = errorPagesDstLocal.union(errorMissingID).dropDuplicates()
-
+    val errorPagesDstLocal = errorPagesDst.union(errorMissingID).dropDuplicates().toDF("id2")
 
     //sottoinsieme delle pagine italiane compresse che hanno avuto problemi
-    val joinedCompressedDst = dataFrameDst.join(errorPagesDstLocal, dataFrameDst("id") === errorPagesDstLocal("id2"), "inner").
-      select("id", "id_pagina_originale", "num_visualiz_anno", "num_visualiz_mesi", "byte_dim_page", "id_redirect")
+    val joinedCompressedDst = dataFrameDst.join(errorPagesDstLocal, dataFrameDst("id") === errorPagesDstLocal("id2"), "left_outer")//.select("id", "id_pagina_originale", "num_visualiz_anno", "num_visualiz_mesi", "byte_dim_page", "id_redirect")
 
-    joinedCompressedDst.dtypes.foreach(println)
-
-    //rimozione dalle pagine compresse di quelle con errori
-    val resultDataFrameDst = dataFrameDst.except(joinedCompressedDst).toDF("id", "id_pagina_originale", "num_visualiz_anno", "num_visualiz_mesi", "byte_dim_page", "id_redirect")
-
-    resultDataFrameDst.dtypes.foreach(println)
+    val resultDataFrameDst = joinedCompressedDst.filter(joinedCompressedDst.col("id2").isNull).select("id", "id_pagina_originale", "num_visualiz_anno", "num_visualiz_mesi", "byte_dim_page", "id_redirect")
 
     (resultDataFrameSrc, resultDataFrameDst)
   }

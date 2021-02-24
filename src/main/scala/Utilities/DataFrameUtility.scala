@@ -118,7 +118,7 @@ package Utilities {
       APIPageView.resetErrorList()
       APIRedirect.resetErrorList()
 
-      println("errorPagesSrc num partition:" + errorPagesSrc.rdd.getNumPartitions)
+
 
       val tempResultSrc = errorPagesSrc.map(page => {
         val line = page.getString(0)
@@ -157,18 +157,6 @@ package Utilities {
 
       val errorPagesDst2 = errorPagesDst.union(newDstPages).dropDuplicates()
 
-
-      //val dstPagesWithHash = errorPagesDst2.filter(x => {x.getString(0).contains("#")})
-
-      //val dstPagesToRetryWithoutHash = errorPagesDst2.except(dstPagesWithHash)
-
-      /*
-      val dstPagesToRetryWithHash = dstPagesWithHash.map(x => {
-        x.getString(0).split("#")(0)
-      }).toDF("id2")
-
-      val dstPagesToRetry = dstPagesToRetryWithoutHash.union(dstPagesToRetryWithHash)
-      */
 
       val tempResultDst = errorPagesDst2.map(page => {
         val line = page.getString(0)
