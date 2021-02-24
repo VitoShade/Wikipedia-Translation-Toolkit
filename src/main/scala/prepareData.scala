@@ -10,7 +10,7 @@ import scala.collection.mutable.{WrappedArray => WA}
 object prepareData extends App {
   override def main(args: Array[String]) {
 
-    val sparkSession = SparkSession.builder().appName("prepareData").getOrCreate()
+    val sparkSession = SparkSession.builder().master("local[4]").appName("prepareData").getOrCreate()
     val sparkContext = sparkSession.sparkContext
     sparkContext.setLogLevel("WARN")
 
@@ -183,15 +183,22 @@ object prepareData extends App {
       (row.getString(0), if(row.getString(5).nonEmpty) row.getString(5) else row.getString(0), row.getInt(4))
     }).toDF("id2", "id_redirect2", "dim2")
 
-    val df3 = df1.join(transDF, df1("id_redirect2")===transDF("id"), "left_outer").na.fill("", Seq("id_pagina_originale")).na.fill(0, Seq("byte_dim_page")).map(row => {
+    val df3 = df1.join(transDF, df1("id_redirect2")===transDF("id"), "left_outer")
+      .na.fill("", Seq("id_pagina_originale"))
+      .na.fill(0, Seq("byte_dim_page"))
+      .map(row => {
       val id = row.getString(0)
       val id_redirect = row.getString(1)
       val dim = if(row.getString(1) == row.getString(0)) row.getInt(2) else row.getInt(7)
       (id, id_redirect, dim)
       }
-    ).toDF("id2", "id_redirect2", "dim2")
+    ).toDF("id2", "id_redirect2", "dim2").dropDuplicates()
 
-    val res = mainDF.join(df3, mainDF("id_pagina_tradotta")===df3("id2")).map( row => {
+    val res = mainDF.join(df3, mainDF("id_pagina_tradotta")===df3("id2"), "left_outer")
+      .na.fill("", Seq("id2"))
+      .na.fill("", Seq("id_redirect2"))
+      .na.fill(0, Seq("dim2"))
+      .map( row => {
         val id = row.getString(0)
         val byte_dim_page = row.getInt(5)
         val id_traduzioni_redirect = row.getAs[mutable.WrappedArray[String]](6)

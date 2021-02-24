@@ -1,7 +1,10 @@
-import org.apache.spark.sql.SparkSession
+import org.apache.spark.sql.{SparkSession, functions}
 import org.apache.spark.sql.functions.desc
+
 import scala.collection.mutable.{WrappedArray => WA}
 import org.apache.spark.sql.functions.udf
+
+import scala.collection.mutable
 import scala.math._
 
 object analyseData extends App {
@@ -38,10 +41,17 @@ object analyseData extends App {
     //"id", "num_traduzioni", "id_pagina_tradotta", "num_visualiz_anno", "num_visualiz_mesi", "byte_dim_page", "id_traduzioni_redirect"
 
     // DF italiano
-    // //"id", "id_pagina_originale", "num_visualiz_anno", "num_visualiz_mesi", "byte_dim_page", "id_redirect"
+    //"id", "id_pagina_originale", "num_visualiz_anno", "num_visualiz_mesi", "byte_dim_page", "id_redirect"
 
     // DF dimPages
     //"id", "byte_dim_page", "id_traduzioni_redirect", "id_traduzioni_redirect_dim" ("id_ita", "byte_dim_page_ita_original), byte_dim_page_tot=sum byte dim page"
+
+    val redirectCorrection_ = udf((idPaginaTradotta: String, idTraduzioniRedirect: WA[String]) => {
+      if(idPaginaTradotta.isEmpty && idTraduzioniRedirect.nonEmpty)
+        idTraduzioniRedirect.mkString(",")
+      else
+        ""
+    })
 
     val sumLong_ = udf((xs: WA[Long]) => xs.sum.toInt)
     val sumInt_ = udf((xs: WA[Int]) => xs.sum)
@@ -55,8 +65,10 @@ object analyseData extends App {
 
     def score_(max: Int) = udf((xs: Int) => xs * 100.toDouble / max )
 
-    //dataframe con score
-    var scoreDF = minMaxSrc.withColumn("score",score_(maxSrc)($"sum")).sort(desc("score"))
+    //dataframe con score ed eventuale pagina consigliata in caso di errori di linking
+    var scoreDF = minMaxSrc.withColumn("score",score_(maxSrc)($"sum"))
+      .withColumn("pagine_suggerite", redirectCorrection_($"id_pagina_tradotta", $"id_traduzioni_redirect"))
+      .sort(desc("score"))
 
     var scoreDFDst = minMaxDst.withColumn("score",score_(maxDst)($"sum")).sort(desc("score"))
 
@@ -132,12 +144,10 @@ object analyseData extends App {
 
     // riporto lo score
     scoreDF = scoreDF.drop("score").join(dataFrameSize.select("id", "score"), Seq("id")).sort(desc("score"))
-    scoreDF.show(20,false)
+    //scoreDF.show(20,false)
 
-    scoreDF.coalesce(1).write.parquet(outputFolderName+"rankPARQ")
+    scoreDF.select("id", "score", "pagine_suggerite").coalesce(1).write.csv(outputFolderName+"rankCSV")
 
-    scoreDF.select("id", "score").rdd.coalesce(1).saveAsTextFile(outputFolderName+"rankTXT")
-    scoreDF.select("id", "score").coalesce(1).write.csv(outputFolderName+"rankCSV")
 
     val endTime = System.currentTimeMillis()
 
