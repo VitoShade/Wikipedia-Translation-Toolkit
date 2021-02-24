@@ -21,9 +21,8 @@ object analyseData extends App {
 
     val bucket = args(0)
 
-    val inputFolderName   = bucket + "datiFinali/"
+    //TODO
     val outputFolderName  = bucket + "risultato/"
-    val folderSeparator   = "/"
 
     val startTime = System.currentTimeMillis()
 
