@@ -125,11 +125,9 @@ object analyseData extends App {
     scoreDF = scoreDF.drop("sum","scoreIta","id_pagina_tradotta")
 
     //dimensioni
-
     dataFrameSize = dataFrameSize.join(scoreDF.select("id","score"),Seq("id")).sort(desc("score"))
 
     // bonus pagina senza traduzione linkate correttamente
-
     val translateBonus_ = udf((score: Double, idIta: String, singleEn: Int, sumEn: Int, singleIt:Int, redirectDim:Int ) => {
       val byteEn = if(idIta.isEmpty) singleEn else sumEn
       val byteIt = singleIt + redirectDim
