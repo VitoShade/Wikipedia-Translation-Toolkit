@@ -47,7 +47,7 @@ object showData extends App {
 
      */
 
-    var dataFrameSrc = sparkSession.read.parquet(bucket + args(1)).repartition(80)
+    val dataFrameSrc = sparkSession.read.parquet(bucket + args(1)).repartition(80)
     var dataFrameDst = sparkSession.read.parquet(bucket + args(2)).repartition(8)
 
     val errorPagesSrc = sparkSession.read.textFile(errorFolderName + "errors.txt").toDF("id2")
@@ -73,8 +73,6 @@ object showData extends App {
     // Creazione DataFrame dimensioni
     var dataFrameSize = makeDimDF(resultDataFrameSrc, resultDataFrameDst, sparkSession)
 
-    dataFrameSrc = resultDataFrameSrc
-    dataFrameDst = resultDataFrameDst
 
 
     // Inizio anaalisi
@@ -83,8 +81,8 @@ object showData extends App {
     val sumInt_ = udf((xs: WA[Int]) => xs.sum)
 
     // Somma visualizzazioni anno
-    val minMaxSrc = dataFrameSrc.withColumn("sum", sumLong_($"num_visualiz_anno")).sort(desc("sum"))
-    val minMaxDst = dataFrameDst.withColumn("sum", sumInt_($"num_visualiz_anno")).sort(desc("sum"))
+    val minMaxSrc = resultDataFrameSrc.withColumn("sum", sumLong_($"num_visualiz_anno")).sort(desc("sum"))
+    val minMaxDst = resultDataFrameDst.withColumn("sum", sumInt_($"num_visualiz_anno")).sort(desc("sum"))
 
     val maxSrc = minMaxSrc.first().getAs[Int](7)
     val maxDst = minMaxDst.first().getAs[Int](6)
@@ -186,15 +184,4 @@ object showData extends App {
     //ferma anche lo sparkContext
     sparkSession.stop()
   }
-
-  def memoryInfo(): Unit = {
-    val mb = 1024*1024
-    val runtime = Runtime.getRuntime
-    println("ALL RESULTS IN MB")
-    println("** Used Memory:  " + (runtime.totalMemory - runtime.freeMemory) / mb)
-    println("** Free Memory:  " + runtime.freeMemory / mb)
-    println("** Total Memory: " + runtime.totalMemory / mb)
-    println("** Max Memory:   " + runtime.maxMemory / mb)
-  }
-
 }

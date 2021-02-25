@@ -1,8 +1,7 @@
 import java.net.URLDecoder
 import API._
 import org.apache.spark.sql.{DataFrame, SparkSession}
-import Utilities._
-import org.apache.spark.sql.functions.{col, collect_set, explode, sum, udf, when}
+import org.apache.spark.sql.functions.{col, collect_set, explode, sum, when}
 
 import scala.collection.mutable
 import scala.collection.mutable.{WrappedArray => WA}
