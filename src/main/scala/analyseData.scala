@@ -71,7 +71,7 @@ object analyseData extends App {
     var scoreDFDst = minMaxDst.withColumn("score",score_(maxDst)($"sum")).sort(desc("score"))
 
     // Crescita/decrescita per anni/mesi
-    def growingYearBonuses_ = udf((score: Double, xs: WA[AnyVal]) => {
+    val growingYearBonuses_ = udf((score: Double, xs: WA[AnyVal]) => {
 
       val years = xs.map(xi => {xi.asInstanceOf[Number].longValue()})
 
@@ -84,7 +84,7 @@ object analyseData extends App {
     scoreDF = scoreDF.withColumn("score",growingYearBonuses_($"score", $"num_visualiz_anno")).sort(desc("score"))
     scoreDFDst = scoreDFDst.withColumn("score",growingYearBonuses_($"score", $"num_visualiz_anno")).sort(desc("score"))
 
-    def growingMonthBonuses_ = udf((score: Double, xs: WA[AnyVal]) => {
+    val growingMonthBonuses_ = udf((score: Double, xs: WA[AnyVal]) => {
 
       val months = xs.map(xi => {xi.asInstanceOf[Number].longValue()})
 
