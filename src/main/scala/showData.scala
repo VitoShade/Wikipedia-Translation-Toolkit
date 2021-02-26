@@ -1,4 +1,4 @@
-import java.net.URLDecoder
+import java.net.{URLDecoder, URLEncoder}
 import API._
 import org.apache.spark.sql.{DataFrame, SparkSession}
 import Utilities._
@@ -7,7 +7,6 @@ import prepareData.{compressRedirect, makeDimDF, missingIDsDF, removeErrorPages}
 
 import scala.collection.mutable
 import scala.collection.mutable.{WrappedArray => WA}
-
 import org.apache.spark.sql.SparkSession
 import org.apache.spark.sql.functions.{desc, udf}
 
@@ -44,8 +43,20 @@ object showData extends App {
     //DataFrameUtility.dataFrameFromFoldersRecursively(Array("C:\\Users\\nik_9\\Desktop\\prova\\Nuova cartella"), "en", sparkSession).coalesce(1).write.parquet("C:\\Users\\nik_9\\Desktop\\prova\\unioneCompleta\\en")
     //DataFrameUtility.dataFrameFromFoldersRecursively(Array("C:\\Users\\nik_9\\Desktop\\prova\\Nuova cartella"), "it", sparkSession).coalesce(1).write.parquet("C:\\Users\\nik_9\\Desktop\\prova\\unioneCompleta\\it")
 
-    val nFile = args.drop(1).length
-    val bucket = args(0)
+    /*
+    val dataEn = DataFrameUtility.dataFrameFromFoldersRecursively(Array("C:\\Users\\nik_9\\Desktop\\prova\\datiUniti"), "en", sparkSession)
+    val dataIt = DataFrameUtility.dataFrameFromFoldersRecursively(Array("C:\\Users\\nik_9\\Desktop\\prova\\datiUniti"), "it", sparkSession)
+
+
+    val resEn = dataEn.map(row => {
+
+      var paginaDecodificata : String = row.getString(2)
+
+      try {
+        paginaDecodificata = URLDecoder.decode(row.getString(2), "UTF-8")
+      } catch {
+        case e : IllegalArgumentException => println(row.getString(2))
+      }
 
     val errorFolderName   = bucket + "error/"
     val outputFolderName  = bucket + "datiFinali/"

@@ -2,7 +2,6 @@
 import org.apache.spark.sql.SparkSession
 import API._
 import Utilities._
-import java.net._
 
 object downloadData extends App {
   override def main(args: Array[String]) {
@@ -33,23 +32,20 @@ object downloadData extends App {
       val input = sparkContext.textFile(path + inputFolderName + inputFileName, 60)
 
       //chiamata alle API per en.wikipedia e creazione di un record del DataFrame
-      val tempResultSrc = input.map(line => {
+      val tempDataFrameSrc = input.map(line => {
         val tuple1 = APILangLinks.callAPI(line, "en", "it")
         val tuple2 = APIPageView.callAPI(line, "en")
         val tuple3 = APIRedirect.callAPI(line, "en")
-        (line, tuple1._1, URLDecoder.decode(tuple1._2,  "UTF-8"), tuple2._1, tuple2._2, tuple3._1, tuple3._2)
-      }).persist
-
-      //creazione del DataFrame per en.wikipedia
-      val tempDataFrameSrc = tempResultSrc.toDF("id", "num_traduzioni", "id_pagina_tradotta", "num_visualiz_anno", "num_visualiz_mesi", "byte_dim_page", "id_redirect")
+        (line, tuple1._1, tuple1._2, tuple2._1, tuple2._2, tuple3._1, tuple3._2)
+      }).toDF("id", "num_traduzioni", "id_pagina_tradotta", "num_visualiz_anno", "num_visualiz_mesi", "byte_dim_page", "id_redirect").persist
 
       //creazione di una cartella temporanea per il file appena processato
       val tempOutputName = inputFileName.dropRight(4)
 
-      //             "s3n://wtt-s3-X/" "tempResult/"    "fileXX"         "/"               "en"
+      //             "s3n://wtt-s3-X/" "tempResult/"       "fileXXX"           "/"         "en"
       val tempOutputFolderSrc = path + tempFolderName + tempOutputName + folderSeparator + "en"
 
-      //per chiamare la persist
+      //per chiamare la persist ed eseguire i download in parallelo
       tempDataFrameSrc.count()
 
       //salvataggio del file temporaneo
@@ -72,20 +68,17 @@ object downloadData extends App {
       val translatedID = dataFrameTranslatedID.map(row => row.getString(0))
 
       //chiamata alle API per it.wikipedia e creazione di un record del DataFrame
-      val tempResultDst = translatedID.map(line => {
+      val tempDataFrameDst = translatedID.map(line => {
         val tuple1 = APILangLinks.callAPI(line, "it", "en")
         val tuple2 = APIPageView.callAPI(line, "it")
         val tuple3 = APIRedirect.callAPI(line, "it")
-        (line, URLDecoder.decode(tuple1._2,  "UTF-8"), tuple2._1, tuple2._2, tuple3._1, tuple3._2)
-      }).persist
+        (line, tuple1._2, tuple2._1, tuple2._2, tuple3._1, tuple3._2)
+      }).toDF("id", "id_pagina_originale", "num_visualiz_anno", "num_visualiz_mesi", "byte_dim_page", "id_redirect").persist
 
-      //creazione del DataFrame per it.wikipedia
-      val tempDataFrameDst = tempResultDst.toDF("id", "id_pagina_originale", "num_visualiz_anno", "num_visualiz_mesi", "byte_dim_page", "id_redirect")
-
-      //             "s3n://wtt-s3-X/" "tempResult/"      "fileXX"            "/"          "it"
+      //             "s3n://wtt-s3-X/" "tempResult/"       "fileXXX"           "/"         "it"
       val tempOutputFolderDst = path + tempFolderName + tempOutputName + folderSeparator + "it"
 
-      //per chiamare la persist
+      //per chiamare la persist ed eseguire i download in parallelo
       tempDataFrameDst.count()
 
       //salvataggio del file temporaneo
@@ -104,10 +97,7 @@ object downloadData extends App {
 
     val endTime = System.currentTimeMillis()
 
-    val minutes = (endTime - startTime) / 60000
-    val seconds = ((endTime - startTime) / 1000) % 60
-
-    println("Time: " + minutes + " minutes " + seconds + " seconds")
+    println("Time: " + (endTime - startTime) / 60000 + " minutes " + ((endTime - startTime) / 1000) % 60 + " seconds")
 
     //ferma anche lo sparkContext
     sparkSession.stop()

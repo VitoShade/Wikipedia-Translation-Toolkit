@@ -1,10 +1,8 @@
+
 import org.apache.spark.sql.{SparkSession, functions}
 import org.apache.spark.sql.functions.desc
-
 import scala.collection.mutable.{WrappedArray => WA}
 import org.apache.spark.sql.functions.udf
-
-import scala.collection.mutable
 import scala.math._
 
 object analyseData extends App {
@@ -21,7 +19,6 @@ object analyseData extends App {
 
     val bucket = args(0)
 
-    //TODO
     val outputFolderName  = bucket + "risultato/"
 
     val startTime = System.currentTimeMillis()
@@ -43,10 +40,12 @@ object analyseData extends App {
     //"id", "id_pagina_originale", "num_visualiz_anno", "num_visualiz_mesi", "byte_dim_page", "id_redirect"
 
     // DF dimPages
-    //"id", "byte_dim_page", "id_traduzioni_redirect", "id_traduzioni_redirect_dim" ("id_ita", "byte_dim_page_ita_original), byte_dim_page_tot=sum byte dim page"
+    //"id", "byte_dim_page", "id_traduzioni_redirect_dim" ("id_ita", "byte_dim_page_ita_original), byte_dim_page_tot=sum byte dim page"
 
     val redirectCorrection_ = udf((idPaginaTradotta: String, idTraduzioniRedirect: WA[String]) => {
-      if(idPaginaTradotta.isEmpty && idTraduzioniRedirect.nonEmpty)
+      if(idPaginaTradotta.nonEmpty)
+        idPaginaTradotta
+      else if(idTraduzioniRedirect.nonEmpty)
         idTraduzioniRedirect.mkString(",")
       else
         ""
@@ -148,10 +147,7 @@ object analyseData extends App {
 
     val endTime = System.currentTimeMillis()
 
-    val minutes = (endTime - startTime) / 60000
-    val seconds = ((endTime - startTime) / 1000) % 60
-
-    println("Time: " + minutes + " minutes " + seconds + " seconds")
+    println("Time: " + (endTime - startTime) / 60000 + " minutes " + ((endTime - startTime) / 1000) % 60 + " seconds")
 
     //ferma anche lo sparkContext
     sparkSession.stop()

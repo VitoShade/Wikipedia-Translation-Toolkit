@@ -1,8 +1,7 @@
-import java.net.URLDecoder
+
 import API._
 import org.apache.spark.sql.{DataFrame, SparkSession}
 import org.apache.spark.sql.functions.{col, collect_set, explode, sum, when}
-
 import scala.collection.mutable
 import scala.collection.mutable.{WrappedArray => WA}
 
@@ -69,10 +68,7 @@ object prepareData extends App {
 
     val endTime = System.currentTimeMillis()
 
-    val minutes = (endTime - startTime) / 60000
-    val seconds = ((endTime - startTime) / 1000) % 60
-
-    println("Time: " + minutes + " minutes " + seconds + " seconds")
+    println("Time: " + (endTime - startTime) / 60000 + " minutes " + ((endTime - startTime) / 1000) % 60 + " seconds")
 
     //ferma anche lo sparkContext
     sparkSession.stop()
@@ -141,21 +137,18 @@ object prepareData extends App {
         if(row.getAs[WA[String]](35) != null) row.getAs[WA[String]](35) else WA.empty[String]
       )
       ).toDF("id", "num_traduzioni", "id_pagina_tradotta", "num_visualiz_anno", "num_visualiz_mesi", "byte_dim_page", "id_traduzioni_redirect")
-
   }
 
   def missingIDsDF(dataFrameDst: DataFrame, sparkSession: SparkSession) = {
     import sparkSession.implicits._
 
-    val dataFrame = dataFrameDst.union(dataFrameDst.filter(!(col("id_redirect") === "")).select("id_redirect").map(line => {
+    dataFrameDst.union(dataFrameDst.filter(!(col("id_redirect") === "")).select("id_redirect").map(line => {
       val tuple1 = APILangLinks.callAPI(line.getAs[String](0), "it", "en")
       val tuple2 = APIPageView.callAPI(line.getAs[String](0), "it")
       val tuple3 = APIRedirect.callAPI(line.getAs[String](0), "it")
 
-      (line.getAs[String](0), URLDecoder.decode(tuple1._2,  "UTF-8"), tuple2._1, tuple2._2, tuple3._1, tuple3._2)
+      (line.getAs[String](0), tuple1._2, tuple2._1, tuple2._2, tuple3._1, tuple3._2)
     }).toDF("id", "id_pagina_originale", "num_visualiz_anno", "num_visualiz_mesi", "byte_dim_page", "id_redirect"))
-
-    dataFrame
   }
 
   def removeErrorPages(compressedSrc: DataFrame, dataFrameDst: DataFrame, errorMissingID: DataFrame, errorPagesSrc: DataFrame, errorPagesDst: DataFrame) = {
