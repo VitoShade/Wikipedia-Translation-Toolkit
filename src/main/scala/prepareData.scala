@@ -1,7 +1,8 @@
 
 import API._
 import org.apache.spark.sql.{DataFrame, SparkSession}
-import org.apache.spark.sql.functions.{col, collect_set, explode, sum, when}
+import org.apache.spark.sql.functions.{array_contains, col, collect_set, explode, sum, when}
+
 import scala.collection.mutable
 import scala.collection.mutable.{WrappedArray => WA}
 
@@ -47,8 +48,16 @@ object prepareData extends App {
     APIPageView.resetErrorList()
     APIRedirect.resetErrorList()
 
+    //dataFrameSrc.filter("id == 'GNU_General_Public_License' OR id_redirect == 'GNU_General_Public_License'").show(100, false)
+
+    //dataFrameSrc.filter("id == 'Nokia_3100' OR id_redirect == 'Nokia_3100'").show(100, false)
+
     // Compressione dataframe da tradurre (togliendo redirect)
     val compressedSrc = compressRedirect(dataFrameSrc, sparkSession)
+
+    //compressedSrc.filter("size(id_traduzioni_redirect) > 1").show(100, false)
+
+    //compressedSrc.filter("id == 'Nokia_3100'").show(false)
 
     // Chiamata per scaricare pagine italiane che si ottengono tramite redirect
     dataFrameDst = missingIDsDF(dataFrameDst, sparkSession).dropDuplicates()
@@ -56,14 +65,16 @@ object prepareData extends App {
     val errorMissingIDDuplicates = Array[DataFrame](APILangLinks.obtainErrorID().toDF("id2"), APIPageView.obtainErrorID().toDF("id2"), APIRedirect.obtainErrorID().toDF("id2"))
     val errorMissingID = errorMissingIDDuplicates.reduce(_ union _).dropDuplicates().toDF("id2")
 
+    //stampare
+
     // Cancellazione pagine con errori
     val (resultDataFrameSrc, resultDataFrameDst) = removeErrorPages(compressedSrc, dataFrameDst, errorMissingID, errorPagesSrc, errorPagesDst)
 
     // Creazione DataFrame dimensioni
     val dimPageDF = makeDimDF(resultDataFrameSrc, resultDataFrameDst, sparkSession)
 
-    resultDataFrameSrc.coalesce(1).write.parquet(outputFolderName + "en")
-    resultDataFrameDst.coalesce(1).write.parquet(outputFolderName + "it")
+    //resultDataFrameSrc.coalesce(1).write.parquet(outputFolderName + "en")
+    //resultDataFrameDst.coalesce(1).write.parquet(outputFolderName + "it")
     dimPageDF.coalesce(1).write.parquet(sizeFolderName)
 
     val endTime = System.currentTimeMillis()
@@ -225,6 +236,6 @@ object prepareData extends App {
       .withColumnRenamed("sum(byte_dim_page)","byte_dim_page_tot")
       .withColumnRenamed("id_ita", "id_ita2")
 
-    res.join(sumDF, res("id_ita") === sumDF("id_ita2")).drop("id_ita2")
+    finalRes.join(sumDF, finalRes("id_ita") === sumDF("id_ita2")).drop("id_ita2")
   }
 }

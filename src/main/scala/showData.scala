@@ -1,17 +1,8 @@
-import java.net.{URLDecoder, URLEncoder}
-import API._
-import org.apache.spark.sql.{DataFrame, SparkSession}
-import Utilities._
-import org.apache.spark.sql.functions.{col, collect_set, explode, sum, udf, when}
-import prepareData.{compressRedirect, makeDimDF, missingIDsDF, removeErrorPages}
+
+import org.apache.spark.sql.SparkSession
+import org.apache.spark.sql.functions.udf
 
 import scala.collection.mutable
-import scala.collection.mutable.{WrappedArray => WA}
-import org.apache.spark.sql.SparkSession
-import org.apache.spark.sql.functions.{desc, udf}
-
-import scala.collection.mutable.{WrappedArray => WA}
-import scala.math._
 
 
 object showData extends App {

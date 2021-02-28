@@ -87,7 +87,7 @@ package API {
       var ret:(Int, String) = (0, "")
       var counter: Int = 0
       var lista_errori_tmp: Vector[(Int, String)] = Vector()
-      while(!cond && (counter <10)) {
+      while(!cond && (counter < 10)) {
         try {
           result = Http("https://" + URLEncoder.encode(lang, "UTF-8") +
             ".wikipedia.org/w/api.php?action=parse&page=" + URLEncoder.encode(url, "UTF-8") + "&prop=text&format=json").asString

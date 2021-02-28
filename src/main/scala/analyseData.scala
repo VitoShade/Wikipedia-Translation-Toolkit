@@ -8,8 +8,8 @@ import scala.math._
 object analyseData extends App {
   override def main(args: Array[String]) {
 
-    //val sparkSession = SparkSession.builder().master("local[4]").appName("analyseData").getOrCreate()
-    val sparkSession = SparkSession.builder().appName("analyseData").getOrCreate()
+    val sparkSession = SparkSession.builder().master("local[4]").appName("analyseData").getOrCreate()
+    //val sparkSession = SparkSession.builder().appName("analyseData").getOrCreate()
     val sparkContext = sparkSession.sparkContext
 
     sparkContext.setLogLevel("WARN")
@@ -31,6 +31,13 @@ object analyseData extends App {
 
     //dataframe delle dimensioni
     var dataFrameSize = sparkSession.read.parquet(bucket + args(3))
+
+    dataFrameSize.show(false)
+
+    //dataFrameSize.filter("size(id_traduzioni_redirect) > 1").show(100, false)
+
+    dataFrameSize.filter("id == 'GNU_General_Public_License'").show(false)
+
 
 
     // DF standard
@@ -142,7 +149,7 @@ object analyseData extends App {
     scoreDF = scoreDF.drop("score").join(dataFrameSize.select("id", "score"), Seq("id")).sort(desc("score"))
     //scoreDF.show(20,false)
 
-    scoreDF.select("id", "score", "pagine_suggerite").coalesce(1).write.csv(outputFolderName+"rankCSV")
+    //scoreDF.select("id", "score", "pagine_suggerite").coalesce(1).write.csv(outputFolderName+"rankCSV")
 
 
     val endTime = System.currentTimeMillis()

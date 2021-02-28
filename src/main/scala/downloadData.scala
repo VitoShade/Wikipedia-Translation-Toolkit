@@ -1,13 +1,13 @@
 
 import org.apache.spark.sql.SparkSession
-import API._
+import API.{APIPageView, _}
 import Utilities._
 
 object downloadData extends App {
   override def main(args: Array[String]) {
 
-    //val sparkSession = SparkSession.builder().master("local[20]").appName("downloadData").getOrCreate()
-    val sparkSession = SparkSession.builder().appName("downloadData").getOrCreate()
+    val sparkSession = SparkSession.builder().master("local[20]").appName("downloadData").getOrCreate()
+    //val sparkSession = SparkSession.builder().appName("downloadData").getOrCreate()
     val sparkContext = sparkSession.sparkContext
 
     sparkContext.setLogLevel("WARN")
@@ -51,10 +51,10 @@ object downloadData extends App {
       //salvataggio del file temporaneo
       tempDataFrameSrc.coalesce(1).write.parquet(tempOutputFolderSrc)
 
+      val errors = APILangLinks.obtainErrorID() ++ APIPageView.obtainErrorID() ++ APIRedirect.obtainErrorID()
+
       //salvataggio degli errori per le API di en.wikipedia
-      DataFrameUtility.writeFileID(path + tempFolderName + tempOutputName + folderSeparator + "error" + folderSeparator + "errorLangLinks", APILangLinks.obtainErrorID(), sparkContext)
-      DataFrameUtility.writeFileID(path + tempFolderName + tempOutputName + folderSeparator + "error" + folderSeparator + "errorView",      APIPageView.obtainErrorID(), sparkContext)
-      DataFrameUtility.writeFileID(path + tempFolderName + tempOutputName + folderSeparator + "error" + folderSeparator + "errorRedirect",  APIRedirect.obtainErrorID(), sparkContext)
+      DataFrameUtility.writeFileID(path + tempFolderName + tempOutputName + folderSeparator + "errors", errors, sparkContext)
 
       //reset degli errori
       APILangLinks.resetErrorList()
@@ -84,10 +84,10 @@ object downloadData extends App {
       //salvataggio del file temporaneo
       tempDataFrameDst.coalesce(1).write.parquet(tempOutputFolderDst)
 
+      val errorsTranslated = APILangLinks.obtainErrorID() ++ APIPageView.obtainErrorID() ++ APIRedirect.obtainErrorID()
+
       //salvataggio degli errori per le API di it.wikipedia
-      DataFrameUtility.writeFileID(path + tempFolderName + tempOutputName + folderSeparator + "error" + folderSeparator + "errorLangLinksTranslated", APILangLinks.obtainErrorID(), sparkContext)
-      DataFrameUtility.writeFileID(path + tempFolderName + tempOutputName + folderSeparator + "error" + folderSeparator + "errorViewTranslated",      APIPageView.obtainErrorID(), sparkContext)
-      DataFrameUtility.writeFileID(path + tempFolderName + tempOutputName + folderSeparator + "error" + folderSeparator + "errorRedirectTranslated",  APIRedirect.obtainErrorID(), sparkContext)
+      DataFrameUtility.writeFileID(path + tempFolderName + tempOutputName + folderSeparator + "errorsTranslated", errorsTranslated, sparkContext)
 
       //reset degli errori
       APILangLinks.resetErrorList()
