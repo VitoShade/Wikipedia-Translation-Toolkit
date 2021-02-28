@@ -21,9 +21,9 @@ object prepareData extends App {
     val nFile = args.drop(1).length
     val bucket = args(0)
 
-    val errorFolderName   = bucket + "error/"
-    val outputFolderName  = bucket + "datiFinali/"
-    val sizeFolderName    = bucket + "datiFinali/size/"
+    val errorFolderName   = bucket + "error\\"
+    val outputFolderName  = bucket + "datiFinali\\"
+    val sizeFolderName    = bucket + "datiFinali\\size\\"
 
     /*
 
@@ -73,8 +73,8 @@ object prepareData extends App {
     // Creazione DataFrame dimensioni
     val dimPageDF = makeDimDF(resultDataFrameSrc, resultDataFrameDst, sparkSession)
 
-    //resultDataFrameSrc.coalesce(1).write.parquet(outputFolderName + "en")
-    //resultDataFrameDst.coalesce(1).write.parquet(outputFolderName + "it")
+    resultDataFrameSrc.coalesce(1).write.parquet(outputFolderName + "en")
+    resultDataFrameDst.coalesce(1).write.parquet(outputFolderName + "it")
     dimPageDF.coalesce(1).write.parquet(sizeFolderName)
 
     val endTime = System.currentTimeMillis()

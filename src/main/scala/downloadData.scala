@@ -15,9 +15,9 @@ object downloadData extends App {
     //per convertire RDD in DataFrame
     import sparkSession.implicits._
 
-    val inputFolderName   = "indici/"
-    val tempFolderName    = "tempResult/"
-    val folderSeparator   = "/"
+    val inputFolderName   = "indici\\"
+    val tempFolderName    = "tempResult\\"
+    val folderSeparator   = "\\"
 
     val startTime = System.currentTimeMillis()
 

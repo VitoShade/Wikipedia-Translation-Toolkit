@@ -1,8 +1,8 @@
 
-import org.apache.spark.sql.{SparkSession, functions}
-import org.apache.spark.sql.functions.desc
+import org.apache.spark.sql.SparkSession
+import org.apache.spark.sql.functions.{desc, udf}
+
 import scala.collection.mutable.{WrappedArray => WA}
-import org.apache.spark.sql.functions.udf
 import scala.math._
 
 object analyseData extends App {
@@ -19,7 +19,7 @@ object analyseData extends App {
 
     val bucket = args(0)
 
-    val outputFolderName  = bucket + "risultato/"
+    val outputFolderName  = bucket + "risultato\\"
 
     val startTime = System.currentTimeMillis()
 
@@ -31,13 +31,6 @@ object analyseData extends App {
 
     //dataframe delle dimensioni
     var dataFrameSize = sparkSession.read.parquet(bucket + args(3))
-
-    dataFrameSize.show(false)
-
-    //dataFrameSize.filter("size(id_traduzioni_redirect) > 1").show(100, false)
-
-    dataFrameSize.filter("id == 'GNU_General_Public_License'").show(false)
-
 
 
     // DF standard
@@ -149,7 +142,7 @@ object analyseData extends App {
     scoreDF = scoreDF.drop("score").join(dataFrameSize.select("id", "score"), Seq("id")).sort(desc("score"))
     //scoreDF.show(20,false)
 
-    //scoreDF.select("id", "score", "pagine_suggerite").coalesce(1).write.csv(outputFolderName+"rankCSV")
+    scoreDF.select("id", "score", "pagine_suggerite").coalesce(1).write.csv(outputFolderName+"rankCSV")
 
 
     val endTime = System.currentTimeMillis()
