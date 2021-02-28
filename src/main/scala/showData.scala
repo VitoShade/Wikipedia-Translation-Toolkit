@@ -47,8 +47,8 @@ object showData extends App {
 
      */
 
-    val dataFrameSrc = sparkSession.read.parquet(bucket + args(1)).repartition(80)
-    var dataFrameDst = sparkSession.read.parquet(bucket + args(2)).repartition(8)
+    val dataFrameSrc = sparkSession.read.parquet(bucket + args(1)).repartition(160)
+    var dataFrameDst = sparkSession.read.parquet(bucket + args(2)).repartition(16)
 
     val errorPagesSrc = sparkSession.read.textFile(errorFolderName + "errors.txt").toDF("id2")
     val errorPagesDst = sparkSession.read.textFile(errorFolderName + "errorsTranslated.txt").toDF("id2")

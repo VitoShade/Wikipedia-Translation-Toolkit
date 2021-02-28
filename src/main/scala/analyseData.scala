@@ -1,8 +1,8 @@
 
-import org.apache.spark.sql.SparkSession
-import org.apache.spark.sql.functions.{desc, udf}
-
+import org.apache.spark.sql.{SparkSession, functions}
+import org.apache.spark.sql.functions.desc
 import scala.collection.mutable.{WrappedArray => WA}
+import org.apache.spark.sql.functions.udf
 import scala.math._
 
 object analyseData extends App {
@@ -39,10 +39,12 @@ object analyseData extends App {
     //"id", "id_pagina_originale", "num_visualiz_anno", "num_visualiz_mesi", "byte_dim_page", "id_redirect"
 
     // DF dimPages
-    //"id", "byte_dim_page", "id_traduzioni_redirect", "id_traduzioni_redirect_dim" ("id_ita", "byte_dim_page_ita_original), byte_dim_page_tot=sum byte dim page"
+    //"id", "byte_dim_page", "id_traduzioni_redirect_dim" ("id_ita", "byte_dim_page_ita_original), byte_dim_page_tot=sum byte dim page"
 
     val redirectCorrection_ = udf((idPaginaTradotta: String, idTraduzioniRedirect: WA[String]) => {
-      if(idPaginaTradotta.isEmpty && idTraduzioniRedirect.nonEmpty)
+      if(idPaginaTradotta.nonEmpty)
+        idPaginaTradotta
+      else if(idTraduzioniRedirect.nonEmpty)
         idTraduzioniRedirect.mkString(",")
       else
         ""
@@ -68,7 +70,7 @@ object analyseData extends App {
     var scoreDFDst = minMaxDst.withColumn("score",score_(maxDst)($"sum")).sort(desc("score"))
 
     // Crescita/decrescita per anni/mesi
-    def growingYearBonuses_ = udf((score: Double, xs: WA[AnyVal]) => {
+    val growingYearBonuses_ = udf((score: Double, xs: WA[AnyVal]) => {
 
       val years = xs.map(xi => {xi.asInstanceOf[Number].longValue()})
 
@@ -81,7 +83,7 @@ object analyseData extends App {
     scoreDF = scoreDF.withColumn("score",growingYearBonuses_($"score", $"num_visualiz_anno")).sort(desc("score"))
     scoreDFDst = scoreDFDst.withColumn("score",growingYearBonuses_($"score", $"num_visualiz_anno")).sort(desc("score"))
 
-    def growingMonthBonuses_ = udf((score: Double, xs: WA[AnyVal]) => {
+    val growingMonthBonuses_ = udf((score: Double, xs: WA[AnyVal]) => {
 
       val months = xs.map(xi => {xi.asInstanceOf[Number].longValue()})
 
@@ -123,7 +125,7 @@ object analyseData extends App {
     //dimensioni
     dataFrameSize = dataFrameSize.join(scoreDF.select("id","score"),Seq("id")).sort(desc("score"))
 
-    // bonus pagina senza traduzione linkate correttamente
+    //Bonus dimensione ed esistenza pagine
     val translateBonus_ = udf((score: Double, idIta: String, singleEn: Int, sumEn: Int, singleIt:Int, redirectDim:Int ) => {
       val byteEn = if(idIta.isEmpty) singleEn else sumEn
       val byteIt = singleIt + redirectDim
@@ -132,7 +134,6 @@ object analyseData extends App {
       score + bonus + 25.0 * ((byteEn - byteIt).toDouble / math.max(byteEn, byteIt))
     })
 
-    //Aggiungiamo le pagine con link rotti
     dataFrameSize = dataFrameSize.withColumn("score", translateBonus_($"score", $"id_ita", $"byte_dim_page", $"byte_dim_page_tot", $"byte_dim_page_ita_original", $"id_traduzioni_redirect_dim")).sort(desc("score"))
 
     // riporto lo score
@@ -144,10 +145,7 @@ object analyseData extends App {
 
     val endTime = System.currentTimeMillis()
 
-    val minutes = (endTime - startTime) / 60000
-    val seconds = ((endTime - startTime) / 1000) % 60
-
-    println("Time: " + minutes + " minutes " + seconds + " seconds")
+    println("Time: " + (endTime - startTime) / 60000 + " minutes " + ((endTime - startTime) / 1000) % 60 + " seconds")
 
     //ferma anche lo sparkContext
     sparkSession.stop()
