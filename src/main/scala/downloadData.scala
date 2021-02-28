@@ -1,6 +1,6 @@
 
 import org.apache.spark.sql.SparkSession
-import API._
+import API.{APIPageView, _}
 import Utilities._
 
 object downloadData extends App {
