@@ -75,7 +75,16 @@ object showData extends App {
 
 
 
-    // Inizio anaalisi
+    // Inizio analisi
+
+    val redirectCorrection_ = udf((idPaginaTradotta: String, idTraduzioniRedirect: WA[String]) => {
+      if(idPaginaTradotta.nonEmpty)
+        idPaginaTradotta
+      else if(idTraduzioniRedirect.nonEmpty)
+        idTraduzioniRedirect.mkString(",")
+      else
+        ""
+    })
 
     val sumLong_ = udf((xs: WA[Long]) => xs.sum.toInt)
     val sumInt_ = udf((xs: WA[Int]) => xs.sum)
@@ -89,13 +98,15 @@ object showData extends App {
 
     def score_(max: Int) = udf((xs: Int) => xs * 100.toDouble / max )
 
-    //dataframe con score
-    var scoreDF = minMaxSrc.withColumn("score",score_(maxSrc)($"sum")).sort(desc("score"))
+    //dataframe con score ed eventuale pagina consigliata in caso di errori di linking
+    var scoreDF = minMaxSrc.withColumn("score",score_(maxSrc)($"sum"))
+      .withColumn("pagine_suggerite", redirectCorrection_($"id_pagina_tradotta", $"id_traduzioni_redirect"))
+      .sort(desc("score"))
 
     var scoreDFDst = minMaxDst.withColumn("score",score_(maxDst)($"sum")).sort(desc("score"))
 
     // Crescita/decrescita per anni/mesi
-    def growingYearBonuses_ = udf((score: Double, xs: WA[AnyVal]) => {
+    val growingYearBonuses_ = udf((score: Double, xs: WA[AnyVal]) => {
 
       val years = xs.map(xi => {xi.asInstanceOf[Number].longValue()})
 
@@ -108,7 +119,7 @@ object showData extends App {
     scoreDF = scoreDF.withColumn("score",growingYearBonuses_($"score", $"num_visualiz_anno")).sort(desc("score"))
     scoreDFDst = scoreDFDst.withColumn("score",growingYearBonuses_($"score", $"num_visualiz_anno")).sort(desc("score"))
 
-    def growingMonthBonuses_ = udf((score: Double, xs: WA[AnyVal]) => {
+    val growingMonthBonuses_ = udf((score: Double, xs: WA[AnyVal]) => {
 
       val months = xs.map(xi => {xi.asInstanceOf[Number].longValue()})
 
@@ -148,11 +159,9 @@ object showData extends App {
     scoreDF = scoreDF.drop("sum","scoreIta","id_pagina_tradotta")
 
     //dimensioni
-
     dataFrameSize = dataFrameSize.join(scoreDF.select("id","score"),Seq("id")).sort(desc("score"))
 
-    // bonus pagina senza traduzione linkate correttamente
-
+    //Bonus dimensione ed esistenza pagine
     val translateBonus_ = udf((score: Double, idIta: String, singleEn: Int, sumEn: Int, singleIt:Int, redirectDim:Int ) => {
       val byteEn = if(idIta.isEmpty) singleEn else sumEn
       val byteIt = singleIt + redirectDim
@@ -161,25 +170,18 @@ object showData extends App {
       score + bonus + 25.0 * ((byteEn - byteIt).toDouble / math.max(byteEn, byteIt))
     })
 
-    //Aggiungiamo le pagine con link rotti
     dataFrameSize = dataFrameSize.withColumn("score", translateBonus_($"score", $"id_ita", $"byte_dim_page", $"byte_dim_page_tot", $"byte_dim_page_ita_original", $"id_traduzioni_redirect_dim")).sort(desc("score"))
 
     // riporto lo score
     scoreDF = scoreDF.drop("score").join(dataFrameSize.select("id", "score"), Seq("id")).sort(desc("score"))
     //scoreDF.show(20,false)
 
-
-    scoreDF.select("id", "score").coalesce(1).write.csv(outputFolderName+"rankCSV")
-
-
+    scoreDF.select("id", "score", "pagine_suggerite").coalesce(1).write.csv(outputFolderName+"rankCSV")
 
 
     val endTime = System.currentTimeMillis()
 
-    val minutes = (endTime - startTime) / 60000
-    val seconds = ((endTime - startTime) / 1000) % 60
-
-    println("Time: " + minutes + " minutes " + seconds + " seconds")
+    println("Time: " + (endTime - startTime) / 60000 + " minutes " + ((endTime - startTime) / 1000) % 60 + " seconds")
 
     //ferma anche lo sparkContext
     sparkSession.stop()

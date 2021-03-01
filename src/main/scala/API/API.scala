@@ -26,7 +26,7 @@ package API {
       var ret:(Int, String) = (0, "")
       var counter: Int = 0
       var lista_errori_tmp: Vector[(Int, String)] = Vector()
-      while(!cond && (counter < 10)) {
+      while(!cond && (counter < 5)) {
         try {
           result = Http("https://" + URLEncoder.encode(sourceLang, "UTF-8") +
             ".wikipedia.org/w/api.php?action=parse&page=" + URLEncoder.encode(url, "UTF-8") + "&format=json&prop=langlinks"
@@ -87,7 +87,7 @@ package API {
       var ret:(Int, String) = (0, "")
       var counter: Int = 0
       var lista_errori_tmp: Vector[(Int, String)] = Vector()
-      while(!cond && (counter <10)) {
+      while(!cond && (counter <5)) {
         try {
           result = Http("https://" + URLEncoder.encode(lang, "UTF-8") +
             ".wikipedia.org/w/api.php?action=parse&page=" + URLEncoder.encode(url, "UTF-8") + "&prop=text&format=json").asString
@@ -150,7 +150,7 @@ package API {
       var ret:(Array[Int], Array[Int]) = (Array(0, 0, 0), Array(0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0))
       var counter: Int = 0
       var lista_errori_tmp: Vector[(Int, String)] = Vector()
-      while(!cond && (counter < 10)) {
+      while(!cond && (counter < 5)) {
         try {
           result = Http("https://wikimedia.org/api/rest_v1/metrics/pageviews/per-article/" + URLEncoder.encode(lang, "UTF-8") +
             ".wikipedia/all-access/all-agents/" + URLEncoder.encode(url, "UTF-8") + "/monthly/20180101/20210101").asString
@@ -179,7 +179,6 @@ package API {
 
     def parseJSON(response: String): (Array[Int], Array[Int]) = {
       val json = ujson.read(response)
-      //val views: List[Int] = json("items").arr.map(item => item.obj("views").toString.toInt).toList
       val mappa=json("items").arr.map(item => item.obj("timestamp").str.dropRight(4) -> item.obj("views").toString.toInt).toMap
       val anni = List("2018", "2019", "2020")
       val filtrato = anni.map(anno => mappa.filterKeys(_.dropRight(2) contains anno).values.sum)

@@ -1,8 +1,8 @@
 
-import org.apache.spark.sql.{SparkSession, functions}
-import org.apache.spark.sql.functions.desc
+import org.apache.spark.sql.SparkSession
+import org.apache.spark.sql.functions.{desc, udf}
+
 import scala.collection.mutable.{WrappedArray => WA}
-import org.apache.spark.sql.functions.udf
 import scala.math._
 
 object analyseData extends App {
