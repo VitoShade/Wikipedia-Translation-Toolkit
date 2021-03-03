@@ -32,6 +32,9 @@ object analyseData extends App {
     //dataframe delle dimensioni
     var dataFrameSize = sparkSession.read.parquet(bucket + args(3))
 
+    dataFrameSize.filter("byte_dim_page_tot == '42445524850'").show(false)
+
+    println("num " + dataFrameSize.filter("byte_dim_page_tot == '42445524850'").count())
 
     // DF standard
     //"id", "num_traduzioni", "id_pagina_tradotta", "num_visualiz_anno", "num_visualiz_mesi", "byte_dim_page", "id_traduzioni_redirect"
@@ -142,7 +145,7 @@ object analyseData extends App {
     scoreDF = scoreDF.drop("score").join(dataFrameSize.select("id", "score"), Seq("id")).sort(desc("score"))
     //scoreDF.show(20,false)
 
-    scoreDF.select("id", "score", "pagine_suggerite").coalesce(1).write.csv(outputFolderName+"rankCSV")
+    //scoreDF.select("id", "score", "pagine_suggerite").coalesce(1).write.csv(outputFolderName+"rankCSV")
 
 
     val endTime = System.currentTimeMillis()

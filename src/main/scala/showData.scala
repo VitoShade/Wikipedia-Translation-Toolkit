@@ -1,9 +1,14 @@
 
 import API.{APILangLinks, APIPageView, APIRedirect}
-import org.apache.spark.sql.SparkSession
+import Utilities.DataFrameUtility
+import org.apache.spark.sql.{DataFrame, SparkSession}
 import org.apache.spark.sql.functions.{asc, desc, udf}
+import scala.collection.mutable.{WrappedArray => WA}
+import prepareData.{compressRedirect, makeDimDF, missingIDsDF, removeErrorPages}
 
+import java.net.URLDecoder
 import scala.collection.mutable
+import scala.math.tanh
 
 
 object showData extends App {
@@ -35,9 +40,12 @@ object showData extends App {
     //DataFrameUtility.dataFrameFromFoldersRecursively(Array("C:\\Users\\nik_9\\Desktop\\prova\\Nuova cartella"), "en", sparkSession).coalesce(1).write.parquet("C:\\Users\\nik_9\\Desktop\\prova\\unioneCompleta\\en")
     //DataFrameUtility.dataFrameFromFoldersRecursively(Array("C:\\Users\\nik_9\\Desktop\\prova\\Nuova cartella"), "it", sparkSession).coalesce(1).write.parquet("C:\\Users\\nik_9\\Desktop\\prova\\unioneCompleta\\it")
 
-    /*
-    val dataEn = DataFrameUtility.dataFrameFromFoldersRecursively(Array("C:\\Users\\nik_9\\Desktop\\prova\\datiUniti"), "en", sparkSession)
-    val dataIt = DataFrameUtility.dataFrameFromFoldersRecursively(Array("C:\\Users\\nik_9\\Desktop\\prova\\datiUniti"), "it", sparkSession)
+/*
+    val dataEn = DataFrameUtility.dataFrameFromFoldersRecursively(Array("C:\\Users\\nik_9\\Desktop\\prova\\in3M"), "en", sparkSession)
+    val dataIt = DataFrameUtility.dataFrameFromFoldersRecursively(Array("C:\\Users\\nik_9\\Desktop\\prova\\in3M"), "it", sparkSession)
+
+    //println(dataEn.dropDuplicates().count())
+    //println(dataIt.dropDuplicates().count())
 
 
     val resEn = dataEn.map(row => {

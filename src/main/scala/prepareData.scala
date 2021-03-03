@@ -35,7 +35,6 @@ object prepareData extends App {
     val dataFramesIt = args.slice(nFile/2+1, nFile+1) map (tempFile => sparkSession.read.parquet(bucket + tempFile))
     var dataFrameDst = dataFramesIt.reduce(_ union _)
 
-
      */
 
     val dataFrameSrc = sparkSession.read.parquet(bucket + args(1))//.repartition(8)
@@ -48,24 +47,14 @@ object prepareData extends App {
     APIPageView.resetErrorList()
     APIRedirect.resetErrorList()
 
-    //dataFrameSrc.filter("id == 'GNU_General_Public_License' OR id_redirect == 'GNU_General_Public_License'").show(100, false)
-
-    //dataFrameSrc.filter("id == 'Nokia_3100' OR id_redirect == 'Nokia_3100'").show(100, false)
-
     // Compressione dataframe da tradurre (togliendo redirect)
     val compressedSrc = compressRedirect(dataFrameSrc, sparkSession)
 
-    //compressedSrc.filter("size(id_traduzioni_redirect) > 1").show(100, false)
-
-    //compressedSrc.filter("id == 'Nokia_3100'").show(false)
-
     // Chiamata per scaricare pagine italiane che si ottengono tramite redirect
-    dataFrameDst = missingIDsDF(dataFrameDst, sparkSession).dropDuplicates()
+    //dataFrameDst = missingIDsDF(dataFrameDst, sparkSession).dropDuplicates()
 
     val errorMissingIDDuplicates = Array[DataFrame](APILangLinks.obtainErrorID().toDF("id2"), APIPageView.obtainErrorID().toDF("id2"), APIRedirect.obtainErrorID().toDF("id2"))
     val errorMissingID = errorMissingIDDuplicates.reduce(_ union _).dropDuplicates().toDF("id2")
-
-    //stampare
 
     // Cancellazione pagine con errori
     val (resultDataFrameSrc, resultDataFrameDst) = removeErrorPages(compressedSrc, dataFrameDst, errorMissingID, errorPagesSrc, errorPagesDst)
@@ -73,9 +62,13 @@ object prepareData extends App {
     // Creazione DataFrame dimensioni
     val dimPageDF = makeDimDF(resultDataFrameSrc, resultDataFrameDst, sparkSession)
 
-    resultDataFrameSrc.coalesce(1).write.parquet(outputFolderName + "en")
-    resultDataFrameDst.coalesce(1).write.parquet(outputFolderName + "it")
-    dimPageDF.coalesce(1).write.parquet(sizeFolderName)
+    resultDataFrameSrc.show(false)
+    resultDataFrameDst.show(false)
+    dimPageDF.show(false)
+
+    //resultDataFrameSrc.coalesce(1).write.parquet(outputFolderName + "en")
+    //resultDataFrameDst.coalesce(1).write.parquet(outputFolderName + "it")
+    //dimPageDF.coalesce(1).write.parquet(sizeFolderName)
 
     val endTime = System.currentTimeMillis()
 
