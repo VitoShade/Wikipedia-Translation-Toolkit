@@ -242,6 +242,6 @@ object prepareData extends App {
 
     //L'output è un dataframe con i record fatti in questo modo:
     //("id", "byte_dim_page", "id_traduzioni_redirect_dim" "id_ita", "byte_dim_page_ita_original", "byte_dim_page_tot")
-    finalRes.join(sumDF, res("id_ita") === sumDF("id_ita2")).drop("id_ita2")
+    finalRes.join(sumDF, finalRes("id_ita") === sumDF("id_ita2")).drop("id_ita2")
   }
 }
