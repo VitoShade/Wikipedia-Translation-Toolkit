@@ -23,13 +23,13 @@ object analyseData extends App {
     val startTime = System.currentTimeMillis()
 
     //dataFrame dai parquet inglesi
-    val dataFrameSrc = sparkSession.read.parquet(bucket + args(1))
+    val dataFrameSrc = sparkSession.read.parquet(bucket + args(1)).repartition(40)
 
     //dataFrame dai parquet italiani
-    val dataFrameDst = sparkSession.read.parquet(bucket + args(2))
+    val dataFrameDst = sparkSession.read.parquet(bucket + args(2)).repartition(4)
 
     //dataframe delle dimensioni
-    var dataFrameSize = sparkSession.read.parquet(bucket + args(3))
+    var dataFrameSize = sparkSession.read.parquet(bucket + args(3)).repartition(40)
 
 
     // DF standard

@@ -1,4 +1,4 @@
-import java.net.URLDecoder
+
 import API._
 import org.apache.spark.sql.{DataFrame, SparkSession}
 import org.apache.spark.sql.functions.{array_contains, col, collect_set, explode, sum, when}
@@ -35,7 +35,6 @@ object prepareData extends App {
     val dataFramesIt = args.slice(nFile/2+1, nFile+1) map (tempFile => sparkSession.read.parquet(bucket + tempFile))
     var dataFrameDst = dataFramesIt.reduce(_ union _)
 
-
      */
 
     val dataFrameSrc = sparkSession.read.parquet(bucket + args(1)).repartition(40)
@@ -69,10 +68,7 @@ object prepareData extends App {
 
     val endTime = System.currentTimeMillis()
 
-    val minutes = (endTime - startTime) / 60000
-    val seconds = ((endTime - startTime) / 1000) % 60
-
-    println("Time: " + minutes + " minutes " + seconds + " seconds")
+    println("Time: " + (endTime - startTime) / 60000 + " minutes " + ((endTime - startTime) / 1000) % 60 + " seconds")
 
     //ferma anche lo sparkContext
     sparkSession.stop()
@@ -81,6 +77,7 @@ object prepareData extends App {
   def compressRedirect(dataFrameSrc: DataFrame, sparkSession: SparkSession) = {
     import sparkSession.implicits._
 
+    //esplode il dataframe separando le liste delle visualizzazioni anno e messi
     val explodedSrc = dataFrameSrc.select("id", "num_traduzioni", "id_pagina_tradotta", "num_visualiz_anno", "num_visualiz_mesi", "byte_dim_page", "id_redirect")
       .map(row => ( row.getAs[String](0),
         row.getAs[Int](1),
@@ -141,7 +138,6 @@ object prepareData extends App {
         if(row.getAs[WA[String]](35) != null) row.getAs[WA[String]](35) else WA.empty[String]
       )
       ).toDF("id", "num_traduzioni", "id_pagina_tradotta", "num_visualiz_anno", "num_visualiz_mesi", "byte_dim_page", "id_traduzioni_redirect")
-
   }
 
   def missingIDsDF(dataFrameDst: DataFrame, sparkSession: SparkSession) = {
@@ -176,10 +172,13 @@ object prepareData extends App {
   def makeDimDF(mainDF: DataFrame, transDF: DataFrame, sparkSession: SparkSession) = {
     import sparkSession.implicits._
 
+    //Per ogni pagina italiana ci prendiamo (id, redirect, dimensione).
+    //Se la pagina non ha redirect, allora dentro al campo redirect ci mettiamo l'id della pagina
     val df1 = transDF.map(row => {
       (row.getString(0), if(row.getString(5).nonEmpty) row.getString(5) else row.getString(0), row.getInt(4))
     }).toDF("id2", "id_redirect2", "dim2")
 
+    //Se id ed id_redirect2 non sono la stessa, allora cambiamo la dimensione con quella della pagina id_redirect2
     val df3 = df1.join(transDF, df1("id_redirect2")===transDF("id"), "left_outer")
       .na.fill("", Seq("id_pagina_originale"))
       .na.fill(0, Seq("byte_dim_page"))
@@ -191,6 +190,8 @@ object prepareData extends App {
       }
     ).toDF("id2", "id_redirect2", "dim2").dropDuplicates()
 
+    //Per ogni pagina inglese cambiamo la traduzione italiana in modo che se prima puntava ad una redirect, ora punta alla principale
+    //Inoltre aggiungiamo la dimensione della traduzione
     val res = mainDF.join(df3, mainDF("id_pagina_tradotta")===df3("id2"), "left_outer")
       .na.fill("", Seq("id2"))
       .na.fill("", Seq("id_redirect2"))
@@ -206,16 +207,21 @@ object prepareData extends App {
       }
     ).toDF("id",  "byte_dim_page", "id_traduzioni_redirect", "id_ita", "byte_dim_page_ita_original", "id_traduzioni_redirect_dim")
 
+    //Esplodiamo le traduzioni redirect in modo da poterle aggiornare
     val redirect = res.select($"id", explode($"id_traduzioni_redirect")).toDF("id_original", "id_redirect_exploded")
 
+    //Creiamo un DF intermedio con le traduzioni_redirect aggiornate, prendiamo la loro dimensione
+    // e sommiamo per ogni pagine Inglese la dimensione delle redirect di quella pagina
     val DF_join = df3.join(redirect, df3("id2")===redirect("id_redirect_exploded")).map(row => {
       val id = row.getString(3)
       val redirect_dim = row.getInt(2)
       (id, redirect_dim)
-    }).toDF("id3","dim_redirect3").groupBy("id3")
+    }).toDF("id3","dim_redirect3")
+      .groupBy("id3")
       .sum("dim_redirect3")
       .withColumnRenamed("sum(dim_redirect3)","id_traduzioni_redirect_dim3")
 
+    //Aggiorniamo res con la dimensione della pagina tradotta originale e con la dimensione delle traduzioni redirect
     val finalRes = res.join(DF_join, res("id")===DF_join("id3"), "left_outer").na.fill(0, Seq("id_traduzioni_redirect_dim3")).map(row => {
       val id = row.getString(0)
       val byte_dim_page = row.getInt(1)
@@ -225,11 +231,14 @@ object prepareData extends App {
       (id, byte_dim_page, id_ita, byte_dim_page_ita_original, id_traduzioni_redirect_dim)
     }).toDF("id", "byte_dim_page", "id_ita", "byte_dim_page_ita_original", "id_traduzioni_redirect_dim")
 
+    //Per ogni pagina inglese che ha delle redirect con traduzione facciamo la somma di quest'ultime
     val sumDF = finalRes.groupBy("id_ita")
       .sum("byte_dim_page")
       .withColumnRenamed("sum(byte_dim_page)","byte_dim_page_tot")
       .withColumnRenamed("id_ita", "id_ita2")
 
-    finalRes.join(sumDF, finalRes("id_ita") === sumDF("id_ita2")).drop("id_ita2")
+    //L'output è un dataframe con i record fatti in questo modo:
+    //("id", "byte_dim_page", "id_traduzioni_redirect_dim" "id_ita", "byte_dim_page_ita_original", "byte_dim_page_tot")
+    finalRes.join(sumDF, res("id_ita") === sumDF("id_ita2")).drop("id_ita2")
   }
 }
