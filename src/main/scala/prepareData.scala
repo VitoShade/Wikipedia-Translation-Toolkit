@@ -1,138 +1,247 @@
 
-import org.apache.spark.SparkContext
-import org.apache.spark.SparkConf
-import scalaj.http.{Http, HttpConstants, HttpRequest}
+import API._
+import org.apache.spark.sql.{DataFrame, SparkSession}
+import org.apache.spark.sql.functions.{array_contains, col, collect_set, explode, sum, when}
 
-import java.net.URLEncoder
-import java.nio.charset.StandardCharsets
-
-
-object APILangLinks {
-  def callAPI(url: String): scalaj.http.HttpResponse[String] = {
-    var result:scalaj.http.HttpResponse[String] = null
-
-    println(url + " pt1")
-    result = Http("https://en.wikipedia.org/w/api.php?action=parse&page=" + URLEncoder.encode(url, StandardCharsets.UTF_8) + "&format=json&prop=langlinks").asString
-
-    result
-  }
-}
-
-object APIPageView {
-  def callAPI(url: String): scalaj.http.HttpResponse[String] = {
-    var result:scalaj.http.HttpResponse[String] = null
-
-    println(url + " pt2")
-    result = Http("https://wikimedia.org/api/rest_v1/metrics/pageviews/per-article/en.wikipedia/all-access/all-agents/" + URLEncoder.encode(url, StandardCharsets.UTF_8) + "/monthly/20200101/20200201").asString
-
-    result
-  }
-}
-
-object APILangLinksSync {
-  def callAPI(url: String): scalaj.http.HttpResponse[String] = {
-    var result:scalaj.http.HttpResponse[String] = null
-
-    this.synchronized {
-      println(url + " pt1")
-      result = Http("https://en.wikipedia.org/w/api.php?action=parse&page=" + URLEncoder.encode(url, StandardCharsets.UTF_8) + "&format=json&prop=langlinks").asString
-    }
-
-    result
-  }
-}
-
-object APIPageViewSync {
-  def callAPI(url: String): scalaj.http.HttpResponse[String] = {
-    var result:scalaj.http.HttpResponse[String] = null
-
-    this.synchronized {
-      println(url + " pt2")
-      result = Http("https://wikimedia.org/api/rest_v1/metrics/pageviews/per-article/en.wikipedia/all-access/all-agents/" + URLEncoder.encode(url, StandardCharsets.UTF_8) + "/monthly/20200101/20200201").asString
-    }
-
-    result
-  }
-}
+import scala.collection.mutable
+import scala.collection.mutable.{WrappedArray => WA}
 
 object prepareData extends App {
   override def main(args: Array[String]) {
-    val conf = new SparkConf().setAppName("pageRank").setMaster("local[4]")
-    val sc = new SparkContext(conf)
 
-    val inputFile = "C:\\Users\\nik_9\\Desktop\\prova\\indice.txt"
-    val outputFile = "C:\\Users\\nik_9\\Desktop\\prova\\result"
+    val sparkSession = SparkSession.builder().appName("prepareData").getOrCreate()
+    val sparkContext = sparkSession.sparkContext
+    sparkContext.setLogLevel("WARN")
 
-    val input:org.apache.spark.rdd.RDD[String] = sc.textFile(inputFile)
+    //per convertire RDD in DataFrame
+    import sparkSession.implicits._
 
-    //FileUtils.deleteDirectory(new File(outputFile))
+    val startTime = System.currentTimeMillis()
 
-    //val numWorkers = sc.statusTracker.getExecutorInfos
+    val nFile = args.drop(1).length
+    val bucket = args(0)
 
-    //println(numWorkers.length)
+    val errorFolderName   = bucket + "error/"
+    val outputFolderName  = bucket + "datiFinali/"
+    val sizeFolderName    = bucket + "datiFinali/size/"
 
-    /*def currentActiveExecutors(sc: SparkContext): Seq[String] = {
-      val allExecutors = sc.getExecutorMemoryStatus.map(_._1)
-      val driverHost: String = sc.getConf.get("spark.driver.host")
-      allExecutors.filter(! _.split(":")(0).equals(driverHost)).toList
-    }*/
+    /*
 
-    //println(sc.getConf.getInt("spark.executor.instances", 3))
+    // Unione dei DataFrame dai parquet inglesi
+    val dataFramesEn = args.slice(1, nFile/2+1) map (tempFile => sparkSession.read.parquet(bucket + tempFile))
+    var dataFrameSrc = dataFramesEn.reduce(_ union _)
 
+    // Unione dei DataFrame italiani
+    val dataFramesIt = args.slice(nFile/2+1, nFile+1) map (tempFile => sparkSession.read.parquet(bucket + tempFile))
+    var dataFrameDst = dataFramesIt.reduce(_ union _)
 
-    input.map(line => {
+     */
 
-      var result1:scalaj.http.HttpResponse[String] = APILangLinks.callAPI(line)
-      println(result1.body)
+    val dataFrameSrc = sparkSession.read.parquet(bucket + args(1)).repartition(40)
+    var dataFrameDst = sparkSession.read.parquet(bucket + args(2)).repartition(4)
 
-      var result2:scalaj.http.HttpResponse[String] = APIPageView.callAPI(line)
-      println(result2.body)
+    val errorPagesSrc = sparkSession.read.textFile(errorFolderName + "errors.txt").toDF("id2")
+    val errorPagesDst = sparkSession.read.textFile(errorFolderName + "errorsTranslated.txt").toDF("id2")
 
-      //result.saveAsTextFile(outputFile)
+    APILangLinks.resetErrorList()
+    APIPageView.resetErrorList()
+    APIRedirect.resetErrorList()
 
-    }).count()
+    // Compressione dataframe da tradurre (togliendo redirect)
+    val compressedSrc = compressRedirect(dataFrameSrc, sparkSession)
 
+    // Chiamata per scaricare pagine italiane che si ottengono tramite redirect
+    dataFrameDst = missingIDsDF(dataFrameDst, sparkSession).dropDuplicates()
 
+    val errorMissingIDDuplicates = Array[DataFrame](APILangLinks.obtainErrorID().toDF("id2"), APIPageView.obtainErrorID().toDF("id2"), APIRedirect.obtainErrorID().toDF("id2"))
+    val errorMissingID = errorMissingIDDuplicates.reduce(_ union _).dropDuplicates().toDF("id2")
 
-    //    FileUtils.deleteDirectory(new File(outputFile))
-    //    res.saveAsTextFile(outputFile)
+    // Cancellazione pagine con errori
+    val (resultDataFrameSrc, resultDataFrameDst) = removeErrorPages(compressedSrc, dataFrameDst, errorMissingID, errorPagesSrc, errorPagesDst)
 
-    /*val inputFile = "C:\\Users\\nik_9\\Desktop\\soc_Epinions.txt"
-    val outputFile = "C:\\Users\\nik_9\\Desktop\\pageRank"
-    val input = sc.textFile(inputFile)
-    val edges = input.map(s => (s.split("\t"))).
-      map(a => (a(0).toInt,a(1).toInt))
-    val links = edges.groupByKey().
-      partitionBy(new HashPartitioner(4)).persist()
-    var ranks = links.mapValues(v => 1.0)
-    for(i <- 0 until 10) {
-      val contributions = links.join(ranks).flatMap {
-        case (u, (uLinks, rank)) =>
-          uLinks.map(t => (t, rank / uLinks.size))
+    // Creazione DataFrame dimensioni
+    val dimPageDF = makeDimDF(resultDataFrameSrc, resultDataFrameDst, sparkSession)
+
+    resultDataFrameSrc.coalesce(1).write.parquet(outputFolderName + "en")
+    resultDataFrameDst.coalesce(1).write.parquet(outputFolderName + "it")
+    dimPageDF.coalesce(1).write.parquet(sizeFolderName)
+
+    val endTime = System.currentTimeMillis()
+
+    println("Time: " + (endTime - startTime) / 60000 + " minutes " + ((endTime - startTime) / 1000) % 60 + " seconds")
+
+    //ferma anche lo sparkContext
+    sparkSession.stop()
+  }
+
+  def compressRedirect(dataFrameSrc: DataFrame, sparkSession: SparkSession) = {
+    import sparkSession.implicits._
+
+    //esplode il dataframe separando le liste delle visualizzazioni anno e messi
+    val explodedSrc = dataFrameSrc.select("id", "num_traduzioni", "id_pagina_tradotta", "num_visualiz_anno", "num_visualiz_mesi", "byte_dim_page", "id_redirect")
+      .map(row => ( row.getAs[String](0),
+        row.getAs[Int](1),
+        row.getAs[String](6),
+        row.getAs[String](2),
+        row.getAs[WA[Int]](3)(0),
+        row.getAs[WA[Int]](3)(1),
+        row.getAs[WA[Int]](3)(2),
+        row.getAs[WA[Int]](4)(0),
+        row.getAs[WA[Int]](4)(1),
+        row.getAs[WA[Int]](4)(2),
+        row.getAs[WA[Int]](4)(3),
+        row.getAs[WA[Int]](4)(4),
+        row.getAs[WA[Int]](4)(5),
+        row.getAs[WA[Int]](4)(6),
+        row.getAs[WA[Int]](4)(7),
+        row.getAs[WA[Int]](4)(8),
+        row.getAs[WA[Int]](4)(9),
+        row.getAs[WA[Int]](4)(10),
+        row.getAs[WA[Int]](4)(11),
+        row.getAs[Int](5)
+      )
+      ).toDF("id", "num_traduzioni", "id_redirect", "id_pagina_tradotta", "num_visualiz_anno1", "num_visualiz_anno2", "num_visualiz_anno3", "num_visualiz_mesi1", "num_visualiz_mesi2","num_visualiz_mesi3","num_visualiz_mesi4","num_visualiz_mesi5","num_visualiz_mesi6","num_visualiz_mesi7","num_visualiz_mesi8","num_visualiz_mesi9","num_visualiz_mesi10","num_visualiz_mesi11","num_visualiz_mesi12","byte_dim_page")
+
+    //somma del numero di visualizzazioni per pagine che sono redirect
+    val redirectSrc = explodedSrc.filter("id_redirect != ''")
+      .drop("num_traduzioni", "byte_dim_page")
+      .groupBy("id_redirect")
+      .agg(
+        sum($"num_visualiz_anno1"),
+        sum($"num_visualiz_anno2"),
+        sum($"num_visualiz_anno3"),
+        sum($"num_visualiz_mesi1"),
+        sum($"num_visualiz_mesi2"),
+        sum($"num_visualiz_mesi3"),
+        sum($"num_visualiz_mesi4"),
+        sum($"num_visualiz_mesi5"),
+        sum($"num_visualiz_mesi6"),
+        sum($"num_visualiz_mesi7"),
+        sum($"num_visualiz_mesi8"),
+        sum($"num_visualiz_mesi9"),
+        sum($"num_visualiz_mesi10"),
+        sum($"num_visualiz_mesi11"),
+        sum($"num_visualiz_mesi12"),
+        collect_set(when(!(col("id_pagina_tradotta") === ""), col("id_pagina_tradotta"))).as("id_traduzioni_redirect")
+      ).withColumnRenamed("id_redirect","id")
+
+    //somma del numero di visualizzazioni delle redirect alle pagine principali
+    explodedSrc.filter("id_redirect == ''")
+      .join(redirectSrc, Seq("id"), "left_outer")
+      .map(row => (
+        row.getAs[String](0),
+        row.getAs[Int](1),
+        row.getAs[String](3),
+        (4 to 6) map ( i => row.getAs[Int](i)+row.getAs[Long](i+16)),
+        (7 to 18) map ( i => row.getAs[Int](i)+row.getAs[Long](i+16)),
+        row.getAs[Int](19),
+        if(row.getAs[WA[String]](35) != null) row.getAs[WA[String]](35) else WA.empty[String]
+      )
+      ).toDF("id", "num_traduzioni", "id_pagina_tradotta", "num_visualiz_anno", "num_visualiz_mesi", "byte_dim_page", "id_traduzioni_redirect")
+  }
+
+  def missingIDsDF(dataFrameDst: DataFrame, sparkSession: SparkSession) = {
+    import sparkSession.implicits._
+
+    dataFrameDst.union(dataFrameDst.filter(!(col("id_redirect") === "")).select("id_redirect").map(line => {
+      val tuple1 = APILangLinks.callAPI(line.getAs[String](0), "it", "en")
+      val tuple2 = APIPageView.callAPI(line.getAs[String](0), "it")
+      val tuple3 = APIRedirect.callAPI(line.getAs[String](0), "it")
+
+      (line.getAs[String](0), tuple1._2, tuple2._1, tuple2._2, tuple3._1, tuple3._2)
+    }).toDF("id", "id_pagina_originale", "num_visualiz_anno", "num_visualiz_mesi", "byte_dim_page", "id_redirect"))
+  }
+
+  def removeErrorPages(compressedSrc: DataFrame, dataFrameDst: DataFrame, errorMissingID: DataFrame, errorPagesSrc: DataFrame, errorPagesDst: DataFrame) = {
+    //sottoinsieme delle pagine inglesi compresse che hanno avuto problemi
+    val joinedCompressedSrc = compressedSrc.join(errorPagesSrc, compressedSrc("id") === errorPagesSrc("id2"), "left_outer")
+
+    val resultDataFrameSrc = joinedCompressedSrc.filter(joinedCompressedSrc.col("id2").isNull).select("id", "num_traduzioni", "id_pagina_tradotta", "num_visualiz_anno", "num_visualiz_mesi", "byte_dim_page", "id_traduzioni_redirect")
+
+    //pagine italiane che hanno avuto errori con le API
+    val errorPagesDstLocal = errorPagesDst.union(errorMissingID).dropDuplicates().toDF("id2")
+
+    //sottoinsieme delle pagine italiane compresse che hanno avuto problemi
+    val joinedCompressedDst = dataFrameDst.join(errorPagesDstLocal, dataFrameDst("id") === errorPagesDstLocal("id2"), "left_outer")
+
+    val resultDataFrameDst = joinedCompressedDst.filter(joinedCompressedDst.col("id2").isNull).select("id", "id_pagina_originale", "num_visualiz_anno", "num_visualiz_mesi", "byte_dim_page", "id_redirect")
+
+    (resultDataFrameSrc, resultDataFrameDst)
+  }
+
+  def makeDimDF(mainDF: DataFrame, transDF: DataFrame, sparkSession: SparkSession) = {
+    import sparkSession.implicits._
+
+    //Per ogni pagina italiana ci prendiamo (id, redirect, dimensione).
+    //Se la pagina non ha redirect, allora dentro al campo redirect ci mettiamo l'id della pagina
+    val df1 = transDF.map(row => {
+      (row.getString(0), if(row.getString(5).nonEmpty) row.getString(5) else row.getString(0), row.getInt(4))
+    }).toDF("id2", "id_redirect2", "dim2")
+
+    //Se id ed id_redirect2 non sono la stessa, allora cambiamo la dimensione con quella della pagina id_redirect2
+    val df3 = df1.join(transDF, df1("id_redirect2")===transDF("id"), "left_outer")
+      .na.fill("", Seq("id_pagina_originale"))
+      .na.fill(0, Seq("byte_dim_page"))
+      .map(row => {
+      val id = row.getString(0)
+      val id_redirect = row.getString(1)
+      val dim = if(row.getString(1) == row.getString(0)) row.getInt(2) else row.getInt(7)
+      (id, id_redirect, dim)
       }
-      ranks = contributions.reduceByKey((x,y) => x+y).
-        mapValues(v => 0.15+0.85*v)
-    }
-    FileUtils.deleteDirectory(new File(outputFile))
-    ranks.saveAsTextFile(outputFile)*/
-    sc.stop()
+    ).toDF("id2", "id_redirect2", "dim2").dropDuplicates()
+
+    //Per ogni pagina inglese cambiamo la traduzione italiana in modo che se prima puntava ad una redirect, ora punta alla principale
+    //Inoltre aggiungiamo la dimensione della traduzione
+    val res = mainDF.join(df3, mainDF("id_pagina_tradotta")===df3("id2"), "left_outer")
+      .na.fill("", Seq("id2"))
+      .na.fill("", Seq("id_redirect2"))
+      .na.fill(0, Seq("dim2"))
+      .map( row => {
+        val id = row.getString(0)
+        val byte_dim_page = row.getInt(5)
+        val id_traduzioni_redirect = row.getAs[mutable.WrappedArray[String]](6)
+        val id_ita = row.getString(8)
+        val byte_dim_page_ita_original = row.getInt(9)
+        val id_traduzioni_redirect_dim = 0
+        (id, byte_dim_page, id_traduzioni_redirect, id_ita, byte_dim_page_ita_original, id_traduzioni_redirect_dim)
+      }
+    ).toDF("id",  "byte_dim_page", "id_traduzioni_redirect", "id_ita", "byte_dim_page_ita_original", "id_traduzioni_redirect_dim")
+
+    //Esplodiamo le traduzioni redirect in modo da poterle aggiornare
+    val redirect = res.select($"id", explode($"id_traduzioni_redirect")).toDF("id_original", "id_redirect_exploded")
+
+    //Creiamo un DF intermedio con le traduzioni_redirect aggiornate, prendiamo la loro dimensione
+    // e sommiamo per ogni pagine Inglese la dimensione delle redirect di quella pagina
+    val DF_join = df3.join(redirect, df3("id2")===redirect("id_redirect_exploded")).map(row => {
+      val id = row.getString(3)
+      val redirect_dim = row.getInt(2)
+      if(row.getString(1) != row.getString(4))
+        (id, redirect_dim)
+      else
+        ("", 0)
+    }).toDF("id3","dim_redirect3").groupBy("id3")
+      .sum("dim_redirect3")
+      .withColumnRenamed("sum(dim_redirect3)","id_traduzioni_redirect_dim3")
+      .filter("id3 != ''")
+
+    //Aggiorniamo res con la dimensione della pagina tradotta originale e con la dimensione delle traduzioni redirect
+    val finalRes = res.join(DF_join, res("id")===DF_join("id3"), "left_outer").na.fill(0, Seq("id_traduzioni_redirect_dim3")).map(row => {
+      val id = row.getString(0)
+      val byte_dim_page = row.getInt(1)
+      val id_ita = row.getString(3)
+      val byte_dim_page_ita_original = row.getInt(4)
+      val id_traduzioni_redirect_dim = row.getLong(7)
+      (id, byte_dim_page, id_ita, byte_dim_page_ita_original, id_traduzioni_redirect_dim)
+    }).toDF("id", "byte_dim_page", "id_ita", "byte_dim_page_ita_original", "id_traduzioni_redirect_dim")
+
+    //Per ogni pagina inglese che ha delle redirect con traduzione facciamo la somma di quest'ultime
+    val sumDF = finalRes.groupBy("id_ita")
+      .sum("byte_dim_page")
+      .withColumnRenamed("sum(byte_dim_page)","byte_dim_page_tot")
+      .withColumnRenamed("id_ita", "id_ita2")
+
+    //L'output è un dataframe con i record fatti in questo modo:
+    //("id", "byte_dim_page", "id_traduzioni_redirect_dim" "id_ita", "byte_dim_page_ita_original", "byte_dim_page_tot")
+    finalRes.join(sumDF, finalRes("id_ita") === sumDF("id_ita2")).drop("id_ita2")
   }
 }
-
-/*object QuickSort extends App {
-
-  println("ciao")
-
-  val result = Http("https://en.wikipedia.org/w/api.php?action=parse&page=COVID-19_pandemic&format=json&prop=langlinks").asString
-
-  //println(result.body)
-  //println(result.headers)
-
-  /*val source = """{ "some": "JSON source" }"""
-  val jsonAst = source.parseJson // or JsonParser(source)*/
-
-  //println(jsonAst)
-
-  println("fine")
-
-}*/
