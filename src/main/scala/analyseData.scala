@@ -60,6 +60,7 @@ object analyseData extends App {
     val maxSrc = minMaxSrc.first().getAs[Int](7)
     val maxDst = minMaxDst.first().getAs[Int](6)
 
+    //call by name
     def score_(max: Int) = udf((xs: Int) => xs * 100.toDouble / max )
 
     //dataframe con score ed eventuale pagina consigliata in caso di errori di linking
@@ -77,7 +78,7 @@ object analyseData extends App {
       val delta1 = (years(1) - years(0)).toDouble / math.max(years(0),1)
       val delta2 = (years(2) - years(1)).toDouble / math.max(years(0),1)
       //tarare le costanti
-      (tanh(delta1)*6)+(tanh(delta2)*8)+score
+      (tanh(delta1)*6)+(tanh(delta2)*6)+score
     })
 
     scoreDF = scoreDF.withColumn("score",growingYearBonuses_($"score", $"num_visualiz_anno")).sort(desc("score"))
@@ -94,7 +95,7 @@ object analyseData extends App {
       val delta1 = (delta(1) - delta(0)).toDouble / math.max(delta(0),1)
       val delta2 = (delta(2) - delta(1)).toDouble / math.max(delta(0),1)
       //tarare le costanti
-      (tanh(delta1)*2)+(tanh(delta2)*3)+score
+      (tanh(delta1)*2)+(tanh(delta2)*2)+score
     })
 
     scoreDF = scoreDF.withColumn("score",growingMonthBonuses_($"score", $"num_visualiz_mesi")).sort(desc("score"))
@@ -129,9 +130,9 @@ object analyseData extends App {
     val translateBonus_ = udf((score: Double, idIta: String, singleEn: Int, sumEn: Int, singleIt:Int, redirectDim:Int ) => {
       val byteEn = if(idIta.isEmpty) singleEn else sumEn
       val byteIt = singleIt + redirectDim
-      val bonus  = if(idIta.isEmpty) 8.0 else 0.0
+      val bonus  = if(idIta.isEmpty) 10.0 else 0.0
 
-      score + bonus + 25.0 * ((byteEn - byteIt).toDouble / math.max(byteEn, byteIt))
+      score + bonus + 20.0 * ((byteEn - byteIt).toDouble / math.max(byteEn, byteIt))
     })
 
     dataFrameSize = dataFrameSize.withColumn("score", translateBonus_($"score", $"id_ita", $"byte_dim_page", $"byte_dim_page_tot", $"byte_dim_page_ita_original", $"id_traduzioni_redirect_dim")).sort(desc("score"))

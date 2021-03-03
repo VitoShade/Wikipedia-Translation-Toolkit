@@ -215,11 +215,14 @@ object prepareData extends App {
     val DF_join = df3.join(redirect, df3("id2")===redirect("id_redirect_exploded")).map(row => {
       val id = row.getString(3)
       val redirect_dim = row.getInt(2)
-      (id, redirect_dim)
-    }).toDF("id3","dim_redirect3")
-      .groupBy("id3")
+      if(row.getString(1) != row.getString(4))
+        (id, redirect_dim)
+      else
+        ("", 0)
+    }).toDF("id3","dim_redirect3").groupBy("id3")
       .sum("dim_redirect3")
       .withColumnRenamed("sum(dim_redirect3)","id_traduzioni_redirect_dim3")
+      .filter("id3 != ''")
 
     //Aggiorniamo res con la dimensione della pagina tradotta originale e con la dimensione delle traduzioni redirect
     val finalRes = res.join(DF_join, res("id")===DF_join("id3"), "left_outer").na.fill(0, Seq("id_traduzioni_redirect_dim3")).map(row => {
@@ -239,6 +242,6 @@ object prepareData extends App {
 
     //L'output è un dataframe con i record fatti in questo modo:
     //("id", "byte_dim_page", "id_traduzioni_redirect_dim" "id_ita", "byte_dim_page_ita_original", "byte_dim_page_tot")
-    finalRes.join(sumDF, res("id_ita") === sumDF("id_ita2")).drop("id_ita2")
+    finalRes.join(sumDF, finalRes("id_ita") === sumDF("id_ita2")).drop("id_ita2")
   }
 }
