@@ -179,7 +179,6 @@ package API {
 
     def parseJSON(response: String): (Array[Int], Array[Int]) = {
       val json = ujson.read(response)
-      //val views: List[Int] = json("items").arr.map(item => item.obj("views").toString.toInt).toList
       val mappa=json("items").arr.map(item => item.obj("timestamp").str.dropRight(4) -> item.obj("views").toString.toInt).toMap
       val anni = List("2018", "2019", "2020")
       val filtrato = anni.map(anno => mappa.filterKeys(_.dropRight(2) contains anno).values.sum)

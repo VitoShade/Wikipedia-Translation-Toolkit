@@ -24,17 +24,14 @@ object analyseData extends App {
     val startTime = System.currentTimeMillis()
 
     //dataFrame dai parquet inglesi
-    val dataFrameSrc = sparkSession.read.parquet(bucket + args(1))
+    val dataFrameSrc = sparkSession.read.parquet(bucket + args(1)).repartition(40)
 
     //dataFrame dai parquet italiani
-    val dataFrameDst = sparkSession.read.parquet(bucket + args(2))
+    val dataFrameDst = sparkSession.read.parquet(bucket + args(2)).repartition(4)
 
     //dataframe delle dimensioni
-    var dataFrameSize = sparkSession.read.parquet(bucket + args(3))
+    var dataFrameSize = sparkSession.read.parquet(bucket + args(3)).repartition(40)
 
-    dataFrameSize.filter("byte_dim_page_tot == '42445524850'").show(false)
-
-    println("num " + dataFrameSize.filter("byte_dim_page_tot == '42445524850'").count())
 
     // DF standard
     //"id", "num_traduzioni", "id_pagina_tradotta", "num_visualiz_anno", "num_visualiz_mesi", "byte_dim_page", "id_traduzioni_redirect"
@@ -129,7 +126,7 @@ object analyseData extends App {
     //dimensioni
     dataFrameSize = dataFrameSize.join(scoreDF.select("id","score"),Seq("id")).sort(desc("score"))
 
-    // bonus pagina senza traduzione linkate correttamente
+    //Bonus dimensione ed esistenza pagine
     val translateBonus_ = udf((score: Double, idIta: String, singleEn: Int, sumEn: Int, singleIt:Int, redirectDim:Int ) => {
       val byteEn = if(idIta.isEmpty) singleEn else sumEn
       val byteIt = singleIt + redirectDim
@@ -138,14 +135,13 @@ object analyseData extends App {
       score + bonus + 25.0 * ((byteEn - byteIt).toDouble / math.max(byteEn, byteIt))
     })
 
-    //Aggiungiamo le pagine con link rotti
     dataFrameSize = dataFrameSize.withColumn("score", translateBonus_($"score", $"id_ita", $"byte_dim_page", $"byte_dim_page_tot", $"byte_dim_page_ita_original", $"id_traduzioni_redirect_dim")).sort(desc("score"))
 
     // riporto lo score
     scoreDF = scoreDF.drop("score").join(dataFrameSize.select("id", "score"), Seq("id")).sort(desc("score"))
     //scoreDF.show(20,false)
 
-    //scoreDF.select("id", "score", "pagine_suggerite").coalesce(1).write.csv(outputFolderName+"rankCSV")
+    scoreDF.select("id", "score", "pagine_suggerite").coalesce(1).write.csv(outputFolderName+"rankCSV")
 
 
     val endTime = System.currentTimeMillis()
