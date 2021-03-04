@@ -183,12 +183,12 @@ object prepareData extends App {
       .na.fill("", Seq("id_pagina_originale"))
       .na.fill(0, Seq("byte_dim_page"))
       .map(row => {
-      val id = row.getString(0)
-      val id_redirect = row.getString(1)
-      val dim = if(row.getString(1) == row.getString(0)) row.getInt(2) else row.getInt(7)
-      (id, id_redirect, dim)
+        val id = row.getString(0)
+        val id_redirect = row.getString(1)
+        val dim = if(row.getString(1) == row.getString(0)) row.getInt(2) else row.getInt(7)
+        (id, id_redirect, dim)
       }
-    ).toDF("id2", "id_redirect2", "dim2").dropDuplicates()
+      ).toDF("id2", "id_redirect2", "dim2").dropDuplicates()
 
     //Per ogni pagina inglese cambiamo la traduzione italiana in modo che se prima puntava ad una redirect, ora punta alla principale
     //Inoltre aggiungiamo la dimensione della traduzione
@@ -205,7 +205,7 @@ object prepareData extends App {
         val id_traduzioni_redirect_dim = 0
         (id, byte_dim_page, id_traduzioni_redirect, id_ita, byte_dim_page_ita_original, id_traduzioni_redirect_dim)
       }
-    ).toDF("id",  "byte_dim_page", "id_traduzioni_redirect", "id_ita", "byte_dim_page_ita_original", "id_traduzioni_redirect_dim")
+      ).toDF("id",  "byte_dim_page", "id_traduzioni_redirect", "id_ita", "byte_dim_page_ita_original", "id_traduzioni_redirect_dim")
 
     //Esplodiamo le traduzioni redirect in modo da poterle aggiornare
     val redirect = res.select($"id", explode($"id_traduzioni_redirect")).toDF("id_original", "id_redirect_exploded")
